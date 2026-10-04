@@ -1,0 +1,8 @@
+node_modules/
+lib/
+*.tsbuildinfo
+*.tgz
+artifacts/
+.dsh-test-home/
+coverage/
+.DS_Store

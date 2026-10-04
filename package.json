@@ -1,0 +1,20 @@
+{
+  "name": "sieve",
+  "private": true,
+  "type": "module",
+  "description": "Token-saving judgment plugins for DeepSeek Harness, ported from mu",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc -p packages/dsh-sieve/tsconfig.test.json",
+    "build": "tsc -p packages/dsh-sieve/tsconfig.json",
+    "test": "vitest --run"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.8"
+  }
+}
