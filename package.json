@@ -10,7 +10,8 @@
   "scripts": {
     "typecheck": "tsc -p packages/dsh-sieve/tsconfig.test.json",
     "build": "tsc -p packages/dsh-sieve/tsconfig.json",
-    "test": "vitest --run"
+    "test": "vitest --run",
+    "smoke:package": "node scripts/packaging-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.1",
