@@ -6,3 +6,6 @@ artifacts/
 .dsh-test-home/
 coverage/
 .DS_Store
+# Plan and decision notes stay local.
+docs/
+notes/
