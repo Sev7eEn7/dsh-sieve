@@ -1,5 +1,7 @@
 <div align="center">
 
+**中文** | [English](README.en.md)
+
 <img src="assets/banner.webp" alt="sieve" width="100%">
 
 # sieve / dsh-sieve
