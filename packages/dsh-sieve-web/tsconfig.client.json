@@ -1,0 +1,14 @@
+{
+  // The browser half and its tests: DOM and React types. Node types stay for
+  // the tests only; the bundle check rejects any Node module in lib/client.js.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "paths": {
+      "dsh-sieve/status": ["../dsh-sieve/src/status.ts"]
+    }
+  },
+  "include": ["src/client", "src/protocol.ts", "tests/*.client.spec.ts", "tests/*.client.spec.tsx"]
+}

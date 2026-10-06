@@ -15,6 +15,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { ABSTAIN } from './decision.ts'
 import type { DecisionMode, DecisionSpec } from './decision.ts'
 import { isJudgeError } from './errors.ts'
+import type { Inflight } from './inflight.ts'
 import type { JudgeLike } from './judge.ts'
 import type { LedgerRecord, LedgerSink } from './ledger.ts'
 import { LEDGER_RECORD_VERSION } from './ledger.ts'
@@ -41,10 +42,14 @@ export interface DecisionEngineOptions {
   readonly knownSecrets?: (() => readonly string[]) | undefined
   /** Aborts every judge call of this engine, e.g. when the host unloads. */
   readonly signal?: AbortSignal | undefined
+  /** Tracks every decision until its ledger write settles, so the host can wait for both before closing the ledger. */
+  readonly inflight?: Inflight | undefined
 }
 
 export interface DecideOptions {
   readonly signal?: AbortSignal | undefined
+  /** Hosts initialize receipts before doing fallible archive or publication work. */
+  readonly applied?: false | undefined
   /** Stored with the ledger record: where the caller was when it asked, such as a tool call id. */
   readonly origin?: JsonValue | undefined
 }
@@ -71,6 +76,8 @@ interface Evaluation<Out> {
   answers?: Readonly<Record<string, Answer>> | undefined
   latencyMs?: number | undefined
   usage?: JudgeUsage | undefined
+  /** The provider that answered, which may differ from the judge's own id when it delegates per call. */
+  providerId?: string | undefined
   modelId?: string | undefined
   warnings?: readonly JudgeWarning[] | undefined
   failure?: string | undefined
@@ -87,6 +94,7 @@ export class DecisionEngine {
   private readonly recordState: boolean
   private readonly knownSecrets: () => readonly string[]
   private readonly signal: AbortSignal | undefined
+  private readonly inflight: Inflight | undefined
 
   constructor(options: DecisionEngineOptions) {
     this.judge = options.judge
@@ -95,6 +103,11 @@ export class DecisionEngine {
     this.recordState = options.recordState ?? false
     this.knownSecrets = options.knownSecrets ?? (() => environmentSecrets())
     this.signal = options.signal
+    this.inflight = options.inflight
+  }
+
+  private track<T>(work: Promise<T>): Promise<T> {
+    return this.inflight === undefined ? work : this.inflight.track(work)
   }
 
   modeOf(specId: string): DecisionMode {
@@ -132,6 +145,7 @@ export class DecisionEngine {
         answers: result.answers,
         latencyMs: result.latencyMs,
         usage: result.usage,
+        providerId: result.providerId,
         modelId: result.modelId,
         warnings: result.warnings.length > 0 ? result.warnings : undefined,
       }
@@ -153,10 +167,56 @@ export class DecisionEngine {
     }
   }
 
-  async decide<In, const Qs extends Questions, Out extends JsonValue>(
+  decide<In, const Qs extends Questions, Out extends JsonValue>(
     spec: DecisionSpec<In, Qs, Out>,
     input: In,
     options: DecideOptions = {},
+  ): Promise<Decision<Out>> {
+    return this.track(this.decideNow(spec, input, options))
+  }
+
+  /**
+   * Records an outcome the host reached by deterministic rules under a
+   * decision's mode, so the ledger measures it next to the judged ones. The
+   * write is queued; its id is known at once, so later annotations follow it.
+   * @returns the record id, or undefined when the decision is off.
+   */
+  recordRules(
+    spec: { readonly id: string, readonly version: number },
+    entry: {
+      readonly outcome: JsonValue
+      readonly state: JsonValue
+      readonly origin?: JsonValue | undefined
+      readonly savedChars?: number | undefined
+      readonly applied?: boolean | undefined
+    },
+  ): string | undefined {
+    const mode = this.modeOf(spec.id)
+    if (mode === 'off') return undefined
+    const id = randomUUID()
+    void this.track(this.record({
+      v: LEDGER_RECORD_VERSION,
+      id,
+      timestamp: new Date().toISOString(),
+      origin: entry.origin,
+      specId: spec.id,
+      specVersion: spec.version,
+      mode,
+      providerId: 'rules',
+      outcome: entry.outcome,
+      source: 'rules',
+      applied: entry.applied,
+      savedChars: entry.savedChars,
+      stateDigest: digest(entry.state),
+      state: this.recordState ? entry.state : undefined,
+    }))
+    return id
+  }
+
+  private async decideNow<In, const Qs extends Questions, Out extends JsonValue>(
+    spec: DecisionSpec<In, Qs, Out>,
+    input: In,
+    options: DecideOptions,
   ): Promise<Decision<Out>> {
     const mode = this.modeOf(spec.id)
     const fallback = spec.fallback(input)
@@ -177,10 +237,11 @@ export class DecisionEngine {
       id: randomUUID(),
       timestamp: new Date().toISOString(),
       origin: options.origin,
+      applied: options.applied,
       specId: spec.id,
       specVersion: spec.version,
       mode,
-      providerId: judge.id,
+      providerId: evaluation.providerId ?? judge.id,
       modelId: evaluation.modelId,
       outcome,
       source,
@@ -215,10 +276,18 @@ export class DecisionEngine {
    * results), written to the ledger as one record so a long output does not
    * bury everything else. Order is preserved.
    */
-  async decideMany<In, const Qs extends Questions, Out extends JsonValue>(
+  decideMany<In, const Qs extends Questions, Out extends JsonValue>(
     spec: DecisionSpec<In, Qs, Out>,
     inputs: readonly In[],
     options: DecideOptions & { readonly concurrency?: number | undefined } = {},
+  ): Promise<Decision<Out>[]> {
+    return this.track(this.decideManyNow(spec, inputs, options))
+  }
+
+  private async decideManyNow<In, const Qs extends Questions, Out extends JsonValue>(
+    spec: DecisionSpec<In, Qs, Out>,
+    inputs: readonly In[],
+    options: DecideOptions & { readonly concurrency?: number | undefined },
   ): Promise<Decision<Out>[]> {
     const mode = this.modeOf(spec.id)
     const judge = mode === 'off' ? undefined : this.judgeFor(spec.id)
@@ -267,10 +336,11 @@ export class DecisionEngine {
       id: ledgerId,
       timestamp: new Date().toISOString(),
       origin: options.origin,
+      applied: options.applied,
       specId: spec.id,
       specVersion: spec.version,
       mode,
-      providerId: judge.id,
+      providerId: evaluations.find(evaluation => evaluation.providerId !== undefined)?.providerId ?? judge.id,
       modelId: evaluations.find(evaluation => evaluation.modelId !== undefined)?.modelId,
       outcome: decisions.map(decision => decision.outcome),
       source: decisions.some(decision => decision.source === 'judge') ? 'judge' : 'fallback',

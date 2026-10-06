@@ -8,13 +8,17 @@
     "node": "^22.19.0 || >=24.0.0"
   },
   "scripts": {
-    "typecheck": "tsc -p packages/dsh-sieve/tsconfig.test.json",
-    "build": "tsc -p packages/dsh-sieve/tsconfig.json",
+    "typecheck": "tsc -p packages/dsh-sieve/tsconfig.test.json && tsc -p packages/dsh-sieve-web/tsconfig.test.json && tsc -p packages/dsh-sieve-web/tsconfig.client.json",
+    "build": "tsc -p packages/dsh-sieve/tsconfig.json && tsc -p packages/dsh-sieve-web/tsconfig.json && node scripts/build-client.mjs",
     "test": "vitest --run",
-    "smoke:package": "node scripts/packaging-smoke.mjs"
+    "smoke:package": "node scripts/packaging-smoke.mjs",
+    "release:pack": "node scripts/release-pack.mjs",
+    "import:mu": "node scripts/import-mu.mjs",
+    "measure": "node --env-file-if-exists=.env scripts/measure.mjs"
   },
   "devDependencies": {
     "@types/node": "24.19.1",
+    "rolldown": "1.2.12",
     "typescript": "6.0.3",
     "vitest": "4.1.8"
   }

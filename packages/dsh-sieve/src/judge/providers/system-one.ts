@@ -1,16 +1,16 @@
 /**
  * Jev over System One: TypeSafe's own endpoint, or another service that serves
  * the same protocol, such as OpenRouter. Uses `fetch` directly; error messages
- * name the service and the key's variable, never the key or the submitted state.
+ * name the service, never the key or the submitted state.
  *
  * Adapted from mu `packages/kyrn-judge/src/providers/typesafe.ts` (MIT, see
- * THIRD_PARTY_NOTICES.md), without the CLM and key-optional variants.
+ * THIRD_PARTY_NOTICES.md), without the CLM, key-optional and key-resolver variants.
  * @module
  */
 
 import { JudgeError } from '../errors.ts'
 import type { JudgeErrorKind } from '../errors.ts'
-import type { Answer, JudgeProvider, JudgeRequest, ProviderResponse, Question } from '../types.ts'
+import type { Answer, JudgeProvider, JudgeRequest, JudgeUsage, ProviderResponse, Question } from '../types.ts'
 import { MAX_ERROR_MESSAGE_LENGTH, messageFromErrorBody, readWarnings } from './http.ts'
 
 export const SYSTEM_ONE_BASE_URL = 'https://api.typesafe.ai/v1/systemone'
@@ -18,13 +18,9 @@ export const SYSTEM_ONE_DEFAULT_MODEL = 'jev-latest'
 /** OpenRouter names Jev its own way. */
 export const OPENROUTER_DEFAULT_MODEL = '~typesafe/jev-latest'
 
-/** A key, or a resolver called per request so the host owns credential storage. */
-export type ApiKeyResolver = () => string | undefined | Promise<string | undefined>
-
 export interface SystemOneJudgeProviderOptions {
-  readonly apiKey: string | ApiKeyResolver
-  /** Where the key comes from, named when it is missing, e.g. "judge.apiKey". */
-  readonly keyName?: string | undefined
+  /** Nonempty; sieve's configuration refuses a system-one judge without one. */
+  readonly apiKey: string
   readonly model?: string | undefined
   /** Any service that speaks System One; empty is TypeSafe's own. */
   readonly baseUrl?: string | undefined
@@ -58,15 +54,41 @@ function toWire(question: Question): Record<string, unknown> {
 const numberOr = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined
 
-function probabilitiesOf(value: unknown): Record<string, number> | undefined {
-  if (typeof value !== 'object' || value === null) return undefined
-  const entries = Object.entries(value).filter((entry): entry is [string, number] => typeof entry[1] === 'number')
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined
+const isProbability = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1
+
+/** Not reported: absent. Invalid: present but not a usable value, which makes the whole answer unusable. */
+const INVALID = Symbol('invalid')
+
+/** An optional probability field: absent or null is unreported, anything else must be in [0, 1]. */
+function optionalProbability(value: unknown): number | undefined | typeof INVALID {
+  if (value === undefined || value === null) return undefined
+  return isProbability(value) ? value : INVALID
+}
+
+/**
+ * A choice distribution. It may be partial (only the picked option), but an
+ * entry that is not a probability invalidates it: dropping just that entry
+ * would read as "no number reported" and lift the policy's threshold.
+ */
+function probabilitiesOf(value: unknown): Record<string, number> | undefined | typeof INVALID {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== 'object' || Array.isArray(value)) return INVALID
+  const entries = Object.entries(value)
+  if (!entries.every(([, probability]) => isProbability(probability))) return INVALID
+  return entries.length > 0 ? Object.fromEntries(entries) as Record<string, number> : undefined
+}
+
+function usageOf(body: SystemOneBody | undefined): JudgeUsage | undefined {
+  const inputTokens = numberOr(body?.usage?.input_tokens)
+  const outputTokens = numberOr(body?.usage?.output_tokens)
+  return inputTokens === undefined && outputTokens === undefined ? undefined : { inputTokens, outputTokens }
 }
 
 function fromWire(question: Question, raw: Record<string, unknown> | undefined): Answer | undefined {
-  if (raw === undefined) return undefined
-  const confidence = numberOr(raw['confidence'])
+  if (typeof raw !== 'object' || raw === null) return undefined
+  const confidence = optionalProbability(raw['confidence'])
+  if (confidence === INVALID) return undefined
   if (question.type === 'boolean') {
     const probability = numberOr(raw['noul'])
     return probability === undefined ? undefined : { type: 'boolean', probability, confidence }
@@ -77,13 +99,14 @@ function fromWire(question: Question, raw: Record<string, unknown> | undefined):
   }
   const choice = raw['choice']
   if (typeof choice !== 'string' || !Object.hasOwn(question.criteria, choice)) return undefined
-  return { type: 'choice', choice, probabilities: probabilitiesOf(raw['probabilities']), confidence }
+  const probabilities = probabilitiesOf(raw['probabilities'])
+  if (probabilities === INVALID) return undefined
+  return { type: 'choice', choice, probabilities, confidence }
 }
 
 export class SystemOneJudgeProvider implements JudgeProvider {
   readonly id: string
-  private readonly apiKey: string | ApiKeyResolver
-  private readonly keyName: string
+  private readonly apiKey: string
   private readonly model: string
   private readonly baseUrl: string
   /** "TypeSafe" at TypeSafe's own address, otherwise the host the requests go to, e.g. "openrouter.ai". */
@@ -92,7 +115,6 @@ export class SystemOneJudgeProvider implements JudgeProvider {
 
   constructor(options: SystemOneJudgeProviderOptions) {
     this.apiKey = options.apiKey
-    this.keyName = options.keyName ?? 'judge.apiKey'
     this.baseUrl = (options.baseUrl === undefined || options.baseUrl === '' ? SYSTEM_ONE_BASE_URL : options.baseUrl).replace(/\/+$/, '')
     this.fetchImpl = options.fetch ?? fetch
     const host = URL.canParse(this.baseUrl) ? new URL(this.baseUrl).host : this.baseUrl
@@ -104,17 +126,12 @@ export class SystemOneJudgeProvider implements JudgeProvider {
   }
 
   async evaluate(request: JudgeRequest): Promise<ProviderResponse> {
-    const apiKey = typeof this.apiKey === 'string' ? this.apiKey : await this.apiKey()
-    if (apiKey === undefined || apiKey === '') {
-      throw new JudgeError('auth', `No API key is configured for Jev at ${this.service} (${this.keyName})`)
-    }
-
     const questions = Object.fromEntries(Object.entries(request.questions).map(([id, question]) => [id, toWire(question)]))
     let response: Response
     try {
       response = await this.fetchImpl(this.baseUrl, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: this.model, state: request.state, questions }),
         ...request.signal === undefined ? {} : { signal: request.signal },
       })
@@ -134,19 +151,24 @@ export class SystemOneJudgeProvider implements JudgeProvider {
       )
     }
 
-    const body = (await response.json().catch(() => undefined)) as SystemOneBody | undefined
+    const parsed: unknown = await response.json().catch(() => undefined)
+    const body = typeof parsed === 'object' && parsed !== null ? parsed as SystemOneBody : undefined
+    // Read before the answers: a reply that cannot be used was still paid for.
+    const usage = usageOf(body)
     if (body === undefined || typeof body.answers !== 'object' || body.answers === null) {
-      throw new JudgeError('invalid_response', `${this.service} response has no answers`, { status: response.status })
+      throw new JudgeError('invalid_response', `${this.service} response has no answers`, { status: response.status, usage })
     }
     const answers: Record<string, Answer> = {}
     for (const [id, question] of Object.entries(request.questions)) {
       const answer = fromWire(question, body.answers[id])
-      if (answer === undefined) throw new JudgeError('invalid_response', `${this.service} gave no usable answer for "${id}"`)
+      if (answer === undefined) {
+        throw new JudgeError('invalid_response', `${this.service} gave no usable answer for "${id}"`, { status: response.status, usage })
+      }
       answers[id] = answer
     }
     return {
       answers,
-      usage: { inputTokens: numberOr(body.usage?.input_tokens), outputTokens: numberOr(body.usage?.output_tokens) },
+      usage,
       modelId: typeof body.model === 'string' ? body.model : this.model,
       warnings: readWarnings(body.warnings),
     }

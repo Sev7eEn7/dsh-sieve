@@ -4,12 +4,15 @@
  *
  * The spec shape is ported from mu `packages/kyrn-judge/src/decision.ts` (MIT,
  * see THIRD_PARTY_NOTICES.md) so mu's question wordings, policies and versions
- * carry over unchanged; the cascade-only `capabilities` field is dropped.
+ * carry over unchanged. Fields nothing in sieve reads are dropped: the
+ * cascade-only `capabilities`, the descriptive `cacheImpact` and `latency`, and
+ * `allowChoicesWithoutEscape`, whose check never saw the questions built per
+ * input. tests/judge/decisions.spec.ts checks that every choice question of the
+ * shipped decisions has an escape option.
  * @module
  */
 
 import { validateQuestions } from './judge.ts'
-import { hasEscapeOption } from './policy.ts'
 import type { AnswersFor, JsonValue, JudgeInput, Questions } from './types.ts'
 
 export const ABSTAIN: unique symbol = Symbol('sieve.judge.abstain')
@@ -26,16 +29,6 @@ export type DecisionMode = 'off' | 'shadow' | 'active'
 
 export const DECISION_MODES: readonly DecisionMode[] = ['off', 'shadow', 'active']
 
-/**
- * What acting on the decision does to the provider prompt cache.
- * `prefix-mutating` decisions rewrite earlier context and should only be
- * applied at cache boundaries.
- */
-export type CacheImpact = 'none' | 'append-only' | 'prefix-mutating'
-
-/** `inline` blocks the agent loop, `parallel` races other work, `background` never blocks. */
-export type LatencyClass = 'inline' | 'parallel' | 'background'
-
 export interface DecisionSpec<In, Qs extends Questions, Out extends JsonValue> {
   readonly id: string
   /** Bump whenever question wording or policy changes, so ledger records stay comparable. */
@@ -47,10 +40,6 @@ export interface DecisionSpec<In, Qs extends Questions, Out extends JsonValue> {
    * empty and `policy` receives answers keyed by these ids.
    */
   readonly questionsFor?: (input: In) => Questions
-  readonly cacheImpact: CacheImpact
-  readonly latency: LatencyClass
-  /** Set only when every choice question's option set is truly closed. */
-  readonly allowChoicesWithoutEscape?: boolean
   /** Digest the input into a small state: summaries and metadata, not bulk text. */
   buildState(input: In): JudgeInput
   policy(answers: AnswersFor<Qs>, input: In): Out | Abstain
@@ -65,14 +54,5 @@ export function defineDecision<In, const Qs extends Questions, Out extends JsonV
     throw new TypeError(`Decision "${spec.id}" needs a positive integer version`)
   }
   if (spec.questionsFor === undefined) validateQuestions(spec.questions)
-  if (spec.allowChoicesWithoutEscape !== true) {
-    for (const [questionId, question] of Object.entries(spec.questions)) {
-      if (question.type === 'choice' && !hasEscapeOption(question)) {
-        throw new TypeError(
-          `Choice question "${questionId}" in decision "${spec.id}" has no escape option (none, other, unclear, unknown)`,
-        )
-      }
-    }
-  }
   return spec
 }

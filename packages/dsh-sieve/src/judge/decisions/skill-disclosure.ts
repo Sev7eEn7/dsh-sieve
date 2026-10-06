@@ -4,7 +4,8 @@
  * yes/no per skill decides which descriptions a session starts with.
  *
  * Only a confident "no" hides a skill, and hidden is not gone: the `skill`
- * tool still loads it.
+ * tool still loads it. The first catalog is decided on the first message, when
+ * there is no cached prefix to lose.
  *
  * Ported from mu `packages/kyrn-judge/src/decisions/skill-disclosure.ts` (MIT,
  * see THIRD_PARTY_NOTICES.md); wording, id and version unchanged.
@@ -41,9 +42,6 @@ export function skillQuestionId(index: number): string {
 export const skillDisclosure = defineDecision({
   id: 'skills.disclosure',
   version: 1,
-  // Decided once, on the first message, when there is no cached prefix to lose.
-  cacheImpact: 'prefix-mutating',
-  latency: 'inline',
   questions: {} as Questions,
   questionsFor(input: SkillDisclosureInput): Questions {
     return Object.fromEntries(

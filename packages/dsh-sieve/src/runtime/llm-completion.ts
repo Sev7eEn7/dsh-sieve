@@ -7,6 +7,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import { BlockAssembler } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
@@ -21,6 +22,14 @@ export interface LlmCompletionOptions {
   readonly maxTokens: number
   /** Stamped on the request for routing metadata; never logged by sieve. */
   readonly sessionId?: SessionId | undefined
+}
+
+/** The route an agent's next request goes to: the logged request header, else its options. */
+export function agentRoute(agent: Agent): LlmRoute | undefined {
+  const routed = agent.session.requestHeader()?.config
+  const provider = routed?.provider ?? agent.options.provider
+  const model = routed?.model ?? agent.options.model
+  return provider === undefined || model === undefined ? undefined : { provider, model }
 }
 
 export function judgeUsage(usage: TokenUsage | undefined): JudgeUsage | undefined {

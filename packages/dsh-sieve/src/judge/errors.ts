@@ -28,7 +28,7 @@ export class JudgeError extends Error {
   /** What the failed call still cost, when the provider reported it (an invalid reply is paid for). */
   readonly usage: JudgeUsage | undefined
 
-  constructor(kind: JudgeErrorKind, message: string, options?: { status?: number, cause?: unknown, usage?: JudgeUsage | undefined }) {
+  constructor(kind: JudgeErrorKind, message: string, options?: { status?: number | undefined, cause?: unknown, usage?: JudgeUsage | undefined }) {
     super(message, options?.cause === undefined ? undefined : { cause: options.cause })
     this.name = 'JudgeError'
     this.kind = kind

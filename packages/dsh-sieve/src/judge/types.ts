@@ -55,7 +55,7 @@ export interface BooleanAnswer extends AnswerSignals {
 export interface ChoiceAnswer<Option extends string = string> extends AnswerSignals {
   readonly type: 'choice'
   readonly choice: Option
-  /** Complete distribution over the options, when the provider supplies one. */
+  /** Distribution over the options, when the provider supplies one; may cover only the picked option. */
   readonly probabilities?: Readonly<Partial<Record<Option, number>>> | undefined
 }
 

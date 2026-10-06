@@ -15,7 +15,7 @@
 import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
-import type { LedgerRecord } from '../judge/ledger.ts'
+import type { LedgerAnnotation, LedgerRecord } from '../judge/ledger.ts'
 
 /** Records kept per session; older ones are dropped first. */
 export const LEDGER_SESSION_CAP = 1000
@@ -69,12 +69,15 @@ export class SessionLedgers {
     })
   }
 
-  /** Record whether the host acted on a decision, once it knows (an archive write can still fail after a verdict). */
-  markApplied(sessionId: string, recordId: string, applied: boolean): Promise<void> {
+  /**
+   * Add what the host learned after the record was written: whether it acted
+   * (an archive write can still fail after a verdict), what the verdict saves.
+   */
+  annotate(sessionId: string, recordId: string, patch: LedgerAnnotation): Promise<void> {
     return this.enqueue(sessionId, async () => {
       if (this.table.get(sessionId) === undefined) return
       await this.table.update(sessionId, current => ({
-        records: current.records.map(record => (record.id === recordId ? { ...record, applied } : record)),
+        records: current.records.map(record => (record.id === recordId ? { ...record, ...patch } : record)),
       }))
     })
   }

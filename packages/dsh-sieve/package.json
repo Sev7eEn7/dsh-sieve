@@ -1,8 +1,25 @@
 {
   "name": "dsh-sieve",
-  "version": "0.0.0",
-  "description": "Token-saving judgment plugins for DeepSeek Harness: tool output admission, forgetting, skill disclosure",
+  "version": "0.1.0",
+  "description": "Context admission and disclosure layer for DeepSeek Harness: tool output admission, history forgetting, skill catalog disclosure",
   "license": "MIT",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "context-management",
+    "llm",
+    "agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sev7eEn7/sieve.git",
+    "directory": "packages/dsh-sieve"
+  },
+  "homepage": "https://github.com/Sev7eEn7/sieve#readme",
+  "bugs": {
+    "url": "https://github.com/Sev7eEn7/sieve/issues"
+  },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
@@ -11,7 +28,15 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./status": {
+      "types": "./lib/types/status.d.ts",
+      "default": "./lib/status.js"
+    },
+    "./measurement": {
+      "types": "./lib/types/measurement/probe.d.ts",
+      "default": "./lib/measurement/probe.js"
+    }
   },
   "files": [
     "lib",
@@ -30,7 +55,9 @@
     "@deepseek-ai/cordis": "4.0.5-alpha.1",
     "@deepseek-ai/dsh-agent": "0.2.1-alpha.1",
     "@deepseek-ai/dsh-agent-loop": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-commands": "0.2.1-alpha.1",
     "@deepseek-ai/dsh-compaction": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-credentials": "0.2.1-alpha.1",
     "@deepseek-ai/dsh-llm": "0.2.1-alpha.1",
     "@deepseek-ai/dsh-output-retention": "0.2.1-alpha.1",
     "@deepseek-ai/dsh-session": "0.2.1-alpha.1",
@@ -52,10 +79,17 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.5-alpha.1",
     "@deepseek-ai/dsh-agent": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-commands": "0.2.1-alpha.1",
     "@deepseek-ai/dsh-llm": "0.2.1-alpha.1",
     "@deepseek-ai/dsh-session": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-session-projection": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-spill": "0.2.1-alpha.1",
     "@deepseek-ai/dsh-storage-domain": "0.2.1-alpha.1",
     "@deepseek-ai/dsh-tools": "0.2.1-alpha.1",
-    "@deepseek-ai/schemastery": "~3.18.5-alpha.1"
+    "@deepseek-ai/schemastery": "~3.18.5-alpha.1",
+    "@deepseek-ai/dsh-compaction": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-skill": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-tool-skill": "0.2.1-alpha.1",
+    "@deepseek-ai/dsh-token-meter": "0.2.1-alpha.1"
   }
 }

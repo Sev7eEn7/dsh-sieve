@@ -4,6 +4,8 @@ lib/
 *.tgz
 artifacts/
 .dsh-test-home/
+.env
+.env.*
 coverage/
 .DS_Store
 # Plan and decision notes stay local.
@@ -11,3 +13,10 @@ docs/
 notes/
 AGENTS.md
 .claude/
+
+# Disposable measurement runs and sandbox package caches.
+.dsh-measure-home/
+.pnpm-store/
+
+# Release tarballs built by pnpm release:pack.
+release/

@@ -27,7 +27,8 @@ export interface LedgerRecord {
   readonly modelId?: string | undefined
   /** What the caller acted on. */
   readonly outcome: JsonValue
-  readonly source: 'judge' | 'fallback'
+  /** `rules`: a deterministic outcome reached without a judge, recorded so its effect is measured too. */
+  readonly source: 'judge' | 'fallback' | 'rules'
   /** Why the fallback was used: "shadow", "abstain", or "error:<kind>". */
   readonly reason?: string | undefined
   /** What the judge path produced, when the call succeeded. */
@@ -45,26 +46,21 @@ export interface LedgerRecord {
   } | undefined
   /** Whether the host acted on the outcome, set once it knows; absent until then. */
   readonly applied?: boolean | undefined
+  /**
+   * Net model-facing characters this record's verdict saves (or would save, in
+   * shadow) beyond what is omitted without it, set by the host. Estimated the
+   * same way in every mode, so shadow and active records compare; 0 when the
+   * result would not pass the host's minimum saving.
+   */
+  readonly savedChars?: number | undefined
   /** SHA-256 of the submitted state. The state itself is stored only when the engine is told to. */
   readonly stateDigest: string
   readonly state?: JsonValue | undefined
 }
 
+/** What the host learns about a record after it is written. */
+export type LedgerAnnotation = Partial<Pick<LedgerRecord, 'applied' | 'savedChars'>>
+
 export interface LedgerSink {
   append(record: LedgerRecord): void | Promise<void>
-}
-
-/** Keeps the latest records in memory, for tests and status displays. */
-export class MemoryLedger implements LedgerSink {
-  readonly records: LedgerRecord[] = []
-  private readonly capacity: number
-
-  constructor(capacity = 500) {
-    this.capacity = capacity
-  }
-
-  append(record: LedgerRecord): void {
-    this.records.push(record)
-    if (this.records.length > this.capacity) this.records.shift()
-  }
 }
