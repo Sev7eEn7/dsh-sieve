@@ -40,6 +40,8 @@ At every step of an agent loop, the main model receives the full context again. 
 
 This content is billed as input tokens, takes up the context window, and can dilute model attention. sieve inserts a **judge engine** through DSH's public extension points to control admission, forgetting, and progressive disclosure, giving the main model shorter, more focused context at each step.
 
+The hard part is deciding what can be left out. Fixed rules alone must keep the original whenever they meet an output format they do not recognize. Asking the main model to decide costs its own tokens and a full round of inference, which can outweigh what is saved. sieve therefore hands this step to a dedicated judgment model, **Jev**. Over the System One protocol, Jev answers structured yes/no and single-choice questions directly and returns a probability for each answer; the engine then rewrites or keeps the original according to its thresholds. In offline replay, a single Jev judgment had a median latency of about 0.3 s, and 326 requests cost about $0.03 in total. Without a Jev key, judgments fall back to the session model with no extra account. See [Judge service](#judge-service).
+
 ## Architecture
 
 ```mermaid
@@ -60,7 +62,7 @@ flowchart LR
         D <--> K
     end
 
-    K <-->|ctx.llm / HTTP| J[(Judge model)]
+    K <-->|"System One / ctx.llm"| J[("Judge<br/>Jev · session model")]
     A & F -->|Original content| SP[(Spill archive)]
     K -->|Decision records| L[(ctx.storage ledger)]
     L --> W["/sieve commands · Web panel"]
@@ -77,6 +79,48 @@ flowchart LR
 | **`skills.disclosure`** | Filters the initial skill catalog by task relevance and discloses relevant skills in later rounds as needed. Hidden skills can still be loaded directly. |
 | **Ledger** | One `ctx.storage` document per session, recording each decision's mode, result, usage, and estimated net savings. |
 | **`dsh-sieve-web`** | A panel in the DSH Web right sidebar showing estimated input token reduction, its percentage, and context reduction in characters for the current session. It also configures the API key for the Jev judge service. |
+
+## Judge service
+
+Cases that rules can settle are handled by deterministic rules; whatever the rules cannot settle goes to the judge. A decision point turns the content in question into structured questions (yes/no and single-choice), the judge returns a probability or a choice for each, and the engine decides against its thresholds whether to rewrite or keep the original.
+
+```mermaid
+flowchart LR
+    D[Decision point] -->|Structured questions<br/>redacted| R{judge.type}
+    R -->|auto: Jev key found| JV["Jev<br/>System One protocol"]
+    R -->|auto: no key / llm| LM["Session model<br/>ctx.llm side call"]
+    R -->|off| RU[Rules only]
+    JV & LM -->|Probability / choice| P{Threshold}
+    P -->|Passes| AP[Rewrite context]
+    P -->|Fails / timeout / error| KP[Keep original]
+```
+
+| Backend | Description | Requires | Cost |
+|---|---|---|---|
+| **Jev** | TypeSafe's structured judgment model. Over the System One protocol it natively answers yes/no and single-choice questions and returns a probability for each answer; sieve's question types match the protocol. Reachable through TypeSafe's own endpoint or OpenRouter. | A TypeSafe or OpenRouter API key | Billed by TypeSafe ([official pricing](https://docs.typesafe.ai/models) on 2026-10-06: input $0.042 per million tokens, output free) |
+| **Session model** | Calls the session's own model, or a provider/model set for judging, through DSH `ctx.llm`, with a fixed prompt that makes the model answer in the same format at `temperature: 0`. | No extra account | Counted against that model's tokens; a cheaper model can be configured for judging |
+| **off** | Calls no model; anything the rules cannot settle is kept as is. | — | None |
+
+The default `auto` looks for a Jev key on every judgment: `TYPESAFE_API_KEY` first, then `SIEVE_JUDGE_OPENROUTER_API_KEY`. With a key it uses Jev, otherwise the session model. Saving, replacing, or removing a key takes effect on the next judgment without a restart.
+
+**Judgments stay out of the main conversation.** Judge calls are side requests: they are not written to the session log, do not enter the main model's context, and do not affect the main model's prompt cache. Content sent to the judge is redacted first, replacing only what is surely a credential: tokens in a credential shape, values assigned to names that say they are secrets, and the values of this process's credential variables.
+
+**Failures always keep the original.** Each judgment has a deadline (4000 ms by default); a timeout, an error, or an invalid answer keeps the original content, and the known cost of a failed call is still recorded in the ledger.
+
+**Measured (Jev).** Offline replay made 326 Jev requests, all successful, with HTTP latency of 287 ms at P50 and 590 ms at P95, costing about $0.031 in total. See [Offline replay results](#offline-replay-results).
+
+### Configuring a Jev key
+
+Either way works:
+
+- **Web panel**: in the right sidebar's **Sieve** page, under "Jev judge service", paste a key for TypeSafe or OpenRouter and save it. The key is stored in `$DSH_HOME/.credentials.yaml`, sent only to the host, and never shown again by the panel. With both configured, TypeSafe is preferred.
+- **Environment variable**: `TYPESAFE_API_KEY` or `SIEVE_JUDGE_OPENROUTER_API_KEY`, set in the shell that starts `dsh`, in a `.env` in the startup directory, or in `$DSH_HOME/.env`. Process environment variables take precedence over keys saved in the panel; the panel then shows the source but cannot change it.
+
+> [!IMPORTANT]
+> With the default `auto`, any `TYPESAFE_API_KEY` in the environment (for example an export in a shell profile, or a project `.env`) switches judgments to Jev and incurs TypeSafe charges. To use only the session model, set `judge.type` to `llm`.
+
+> [!NOTE]
+> sieve's judge engine comes from mu, which judged in a cascade: a local Laya model answered first and passed uncertain cases to Jev. Laya depends on macOS Core ML and a local sidecar process and was not ported to sieve. sieve currently supports only the three backends above.
 
 ## Three operating modes
 
@@ -226,14 +270,24 @@ No configuration is required: the judge defaults to `auto`, and all decisions de
         model: <model>
 ```
 
-| Judge type | Behavior |
+| `judge.type` | Behavior |
 |---|---|
-| `auto` (default) | Uses Jev (System One) if a Jev key is available in DSH credentials; otherwise behaves like `llm`. Credentials are resolved for each decision, so saving or removing a key in the panel takes effect immediately. |
-| `llm` | Calls DSH `ctx.llm`, reusing session routing or specifying a provider/model per decision. |
-| `system-one` | External HTTP judge requiring `apiKey`; referencing an environment variable via `!!js process.env.XXX` is recommended. |
-| `off` | Does not call the judge; each decision uses its fallback behavior. |
+| `auto` (default) | Jev when a Jev key is available, otherwise the session model; see [Judge service](#judge-service). |
+| `llm` | Session model only. Set `provider` and `model` to choose the judging model, or use `routes` to choose one per decision. |
+| `system-one` | Jev only, or any endpoint that speaks the System One protocol. Requires `apiKey` (`!!js process.env.XXX` is recommended); `baseUrl` and `model` (default `jev-latest`) are optional. |
+| `off` | Calls no judge; rules only. |
 
-Jev keys are looked up through DSH credential references: `TYPESAFE_API_KEY` (TypeSafe) first, then `SIEVE_JUDGE_OPENROUTER_API_KEY` (OpenRouter). You can enter a key in the Web panel (stored in `$DSH_HOME/.credentials.yaml`), or provide it through process environment variables, workspace `.env`, or `$DSH_HOME/.env`. Precedence follows DSH credential store rules. A workspace `.env` containing `TYPESAFE_API_KEY` also switches the judge to Jev and incurs TypeSafe charges.
+Example pointing at a Jev endpoint:
+
+```yaml
+- id: sieve
+  config:
+    judge:
+      type: system-one
+      apiKey: !!js process.env.MY_JUDGE_KEY
+      baseUrl: https://<System One endpoint>
+      model: jev-latest
+```
 
 Invalid configuration, such as an unknown decision ID, fails during loading rather than silently falling back.
 

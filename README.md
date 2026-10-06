@@ -40,6 +40,8 @@ Agent 循环里，主模型每一步都要重新读一遍完整上下文。真�
 
 这些内容按输入 token 计费，占用上下文窗口，还会稀释模型注意力。sieve 在 DSH 的公开扩展点上插入一层**判断内核**，对上面三类内容做准入、遗忘和按需披露，让主模型每一步看到的上下文更短、更集中。
 
+难点在于判断「哪些可以省」。只靠固定规则，遇到没见过的输出格式就只能保留原文；交给主模型自己判断，判断本身又要花掉主模型的 token 和一次完整的推理延迟，省下的可能还不够抵消。sieve 因此把这一步交给专门的判断模型 **Jev**：它通过 System One 协议直接回答结构化的是/否题和单选题，并给出概率，内核据此按门槛决定改写还是保留原文。在离线回放中，Jev 单次判断的延迟中位数约 0.3 秒，326 次请求总费用约 $0.03。没有 Jev 密钥时，判断改由会话模型完成，不需要额外账号，详见[判断服务](#判断服务judge)。
+
 ## 架构
 
 ```mermaid
@@ -60,7 +62,7 @@ flowchart LR
         D <--> K
     end
 
-    K <-->|ctx.llm / HTTP| J[(Judge 模型)]
+    K <-->|"System One / ctx.llm"| J[("Judge<br/>Jev · 会话模型")]
     A & F -->|原文| SP[(spill 归档)]
     K -->|决策记录| L[(ctx.storage 账本)]
     L --> W["/sieve 命令 · Web 面板"]
@@ -77,6 +79,48 @@ flowchart LR
 | **`skills.disclosure`** | 首份技能目录按任务相关性过滤，相关技能在后续回合按需公布；被隐藏的技能仍可直接加载 |
 | **账本** | 每个会话一份 `ctx.storage` 文档，记录每次判断的模式、结果、usage 与预计净节省 |
 | **`dsh-sieve-web`** | DSH Web 右侧边栏面板：显示本会话的输入 token 缩减（估算，含缩减率）与上下文缩减字符数，配置 Jev 判断服务的 API 密钥 |
+
+## 判断服务（Judge）
+
+规则能处理的情况由确定性规则直接处理；规则拿不准的部分交给 judge。决策点把待判断的内容整理成结构化问题（是/否题、单选题），judge 对每个问题返回概率或选项，内核再按门槛决定改写还是保留原文。
+
+```mermaid
+flowchart LR
+    D[决策点] -->|结构化问题<br/>已脱敏| R{judge.type}
+    R -->|auto：找到 Jev 密钥| JV["Jev<br/>System One 协议"]
+    R -->|auto：没有密钥 / llm| LM["会话模型<br/>ctx.llm 旁路调用"]
+    R -->|off| RU[只运行规则]
+    JV & LM -->|概率 / 选项| P{门槛}
+    P -->|通过| AP[改写上下文]
+    P -->|未通过 / 超时 / 出错| KP[保留原文]
+```
+
+| 后端 | 说明 | 需要 | 费用 |
+|---|---|---|---|
+| **Jev** | TypeSafe 的结构化判断模型，通过 System One 协议原生回答是/否题和单选题，并返回每个回答的概率。sieve 的题型与该协议一致。可走 TypeSafe 官方端点或 OpenRouter | TypeSafe 或 OpenRouter 的 API 密钥 | 按 TypeSafe 计费（2026-10-06 [官方价格](https://docs.typesafe.ai/models)：输入 $0.042 / 百万 token，输出不计费） |
+| **会话模型** | 通过 DSH 的 `ctx.llm` 调用当前会话的模型，或为判断单独指定的 provider/model；用固定提示词让模型按同一格式作答，`temperature: 0` | 无需额外账号 | 计入所用模型的 token；可以给判断配一个更便宜的模型 |
+| **off** | 不调用任何模型，规则拿不准的部分一律保留原文 | — | 无 |
+
+默认的 `auto` 在每次判断时查找 Jev 密钥：先找 `TYPESAFE_API_KEY`，再找 `SIEVE_JUDGE_OPENROUTER_API_KEY`，找到就用 Jev，找不到就用会话模型。密钥保存、更换或移除后，下一次判断立即生效，不需要重启。
+
+**判断不进入主对话。** judge 调用是旁路请求，不写入会话日志，不进入主模型的上下文，也不影响主模型的提示缓存。发给 judge 的内容会先脱敏：只有可确定是凭据的内容才会被替换，包括凭据形态的 token、名称表明是密钥的赋值，以及当前进程凭据变量的值。
+
+**失败一律保留原文。** 单次判断有时限（默认 4000 ms），超时、出错或回答不合法时都按保留原文处理；失败调用中已知的花费同样记入账本。
+
+**实测（Jev）。** 离线回放中共 326 次 Jev 请求，全部成功；HTTP 延迟 P50 287 ms、P95 590 ms；总费用约 $0.031。详见[离线回放结果](#离线回放结果)。
+
+### 配置 Jev 密钥
+
+任选一种：
+
+- **Web 面板**：右侧栏 **Sieve** 页的「Jev 判断服务」，为 TypeSafe 或 OpenRouter 粘贴密钥并保存。密钥存进 `$DSH_HOME/.credentials.yaml`，只发往宿主，面板不会回显。两个都配置时优先用 TypeSafe。
+- **环境变量**：`TYPESAFE_API_KEY` 或 `SIEVE_JUDGE_OPENROUTER_API_KEY`，可以放在启动 `dsh` 的 shell 环境、启动目录的 `.env` 或 `$DSH_HOME/.env` 中。进程环境变量的优先级高于面板保存的密钥，此时面板只显示来源，不能修改。
+
+> [!IMPORTANT]
+> 使用默认的 `auto` 时，只要环境里存在 `TYPESAFE_API_KEY`（例如 shell 配置文件中的 export，或项目 `.env`），判断就会改走 Jev 并产生 TypeSafe 费用。只想用会话模型时，把 `judge.type` 设为 `llm`。
+
+> [!NOTE]
+> sieve 的判断内核源自 mu。mu 采用级联判断：先由本地 Laya 模型回答，拿不准的再交给 Jev。Laya 依赖 macOS Core ML 和一个本地 sidecar 进程，没有移植到 sieve。sieve 目前只支持上表中的三种后端。
 
 ## 三种运行模式
 
@@ -226,14 +270,24 @@ dsh plugin --profile web remove dsh-sieve-web dsh-sieve
         model: <model>
 ```
 
-| judge 类型 | 说明 |
+| `judge.type` | 说明 |
 |---|---|
-| `auto`（默认） | DSH 凭据存储里有 Jev 密钥时用 Jev（System One），否则同 `llm`；每次判断时解析密钥，面板保存或移除后立即生效 |
-| `llm` | 通过 DSH `ctx.llm` 调用，可复用会话路由或按决策单独指定 provider/model |
-| `system-one` | 外部 HTTP judge，需要 `apiKey`（建议用 `!!js process.env.XXX` 引用环境变量） |
-| `off` | 不调用 judge，各决策取其回退行为 |
+| `auto`（默认） | 有 Jev 密钥时用 Jev，否则用会话模型，见[判断服务](#判断服务judge) |
+| `llm` | 只用会话模型；可写 `provider` 与 `model` 指定判断用的模型，也可用 `routes` 按决策分别指定 |
+| `system-one` | 只用 Jev，或任何兼容 System One 协议的端点；需要 `apiKey`（建议写 `!!js process.env.XXX`），可选 `baseUrl` 与 `model`（默认 `jev-latest`） |
+| `off` | 不调用 judge，只运行规则 |
 
-Jev 密钥按 DSH 凭据引用查找，先 `TYPESAFE_API_KEY`（TypeSafe），再 `SIEVE_JUDGE_OPENROUTER_API_KEY`（OpenRouter）。可在 Web 面板填写（存入 `$DSH_HOME/.credentials.yaml`），也可来自进程环境变量、工作区 `.env` 或 `$DSH_HOME/.env`，优先级按 DSH 凭据存储的规则。注意：工作区 `.env` 里的 `TYPESAFE_API_KEY` 也会让 judge 改用 Jev，产生 TypeSafe 计费。
+指定 Jev 端点的例子：
+
+```yaml
+- id: sieve
+  config:
+    judge:
+      type: system-one
+      apiKey: !!js process.env.MY_JUDGE_KEY
+      baseUrl: https://<System One 端点>
+      model: jev-latest
+```
 
 非法配置（例如未知的决策 id）在加载时直接报错，不会静默回退。
 
