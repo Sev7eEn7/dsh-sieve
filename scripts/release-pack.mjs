@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Build the two bundles and pack them into release/ as the exact tarballs to
-// publish: `npm publish release/<name>-<version>.tgz` for npm, and the same
+// publish: `npm publish ./release/<name>-<version>.tgz` for npm, and the same
 // files attached to the GitHub Release `v<version>` for URL installs. Checks
 // that both packages share one version, that dsh-sieve-web peers on that
 // dsh-sieve version, and that no tarball carries workspace: specifiers or
@@ -56,7 +56,7 @@ console.log(`
 ${sums.join('\n')}
 
 npm:
-${files.map(file => `  npm publish ${file}`).join('\n')}
+${files.map(file => `  npm publish ./${file}`).join('\n')}
 
 GitHub Release v${version}:
   gh release create v${version} ${files.join(' ')} release/SHA256SUMS --repo ${repo}
