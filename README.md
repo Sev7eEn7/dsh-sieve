@@ -15,8 +15,8 @@
 [![DeepSeek Harness](https://img.shields.io/badge/DSH-0.2.1--alpha.1-4D6BFE)](packages/dsh-sieve/package.json)
 [![Cordis](https://img.shields.io/badge/Cordis-4.0.5--alpha.1-6E56CF)](packages/dsh-sieve/package.json)
 <br>
-[![Tests](https://img.shields.io/badge/tests-250%20passed-brightgreen)](vitest.config.ts)
-[![Test keys](https://img.shields.io/badge/test%20suite-no%20API%20keys-brightgreen)](#开发)
+![Tests](https://img.shields.io/badge/tests-250%20passed-brightgreen)
+![Test keys](https://img.shields.io/badge/test%20suite-no%20API%20keys-brightgreen)
 [![DSH core](https://img.shields.io/badge/DSH%20core-0%20patches-brightgreen)](#设计约束)
 [![Cold restore](https://img.shields.io/badge/cold%20restore-replay%20safe-brightgreen)](#设计约束)
 
@@ -245,19 +245,19 @@ Jev 密钥按 DSH 凭据引用查找，先 `TYPESAFE_API_KEY`（TypeSafe），�
 ## 开发
 
 ```bash
-pnpm typecheck
+pnpm install
 ```
 
 ```bash
-pnpm test
+pnpm build
 ```
 
 ```bash
-pnpm smoke:package
+pnpm release:pack
 ```
 
-- 测试套件完全不需要 API 密钥：judge 使用 Mock 或脚本化回放，主模型使用脚本化 Loop，零 token 开销。
-- `pnpm smoke:package` 打包 tgz，在仓库内一次性的 `DSH_HOME`（`.dsh-test-home/`）中完成安装、`--dump-config`、启动、Web 面板接口与卸载检查，不触碰本机真实 DSH 目录。
+- `pnpm build` 编译两个包，并把 Web 面板的浏览器端打成 DSH Web 可加载的单文件。
+- `pnpm release:pack` 构建并打包出可安装的 tgz 与 `SHA256SUMS`，见[安装](#方式三从源码构建)。
 - 依赖全部锁定精确版本；`@deepseek-ai/dsh-*` 以精确版本声明为 peer，宿主在安装与启动时校验。
 
 ```
@@ -265,8 +265,7 @@ packages/
 ├── dsh-sieve/          # 插件本体：判断内核、四个决策、账本、/sieve 命令
 │   ├── src/judge/      # 决策引擎、providers、题面与 policy、脱敏
 │   ├── src/features/   # 各决策点与 DSH 扩展点的接线
-│   ├── src/runtime/    # 配置、会话状态推导、账本、状态快照
-│   └── tests/          # 单元、契约、真实 Loop 与冷恢复测试
+│   └── src/runtime/    # 配置、会话状态推导、账本、状态快照
 └── dsh-sieve-web/      # DSH Web 面板（Host 路由 + 浏览器端）
 ```
 

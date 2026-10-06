@@ -20,3 +20,18 @@ AGENTS.md
 
 # Release tarballs built by pnpm release:pack.
 release/
+
+# Progress logs and standalone experiment scripts stay local.
+compatibility.json
+migration-status.md
+test.mjs
+test-*.mjs
+pelican-cycle.html
+
+# Tests, test configs and measurement/smoke scripts stay local.
+packages/*/tests/
+packages/*/tsconfig.test.json
+vitest.config.ts
+scripts/packaging-smoke.mjs
+scripts/measure.mjs
+scripts/measurement/
