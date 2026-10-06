@@ -2,12 +2,14 @@
 
 <img src="assets/banner.webp" alt="sieve" width="100%">
 
-# sieve
+# sieve / dsh-sieve
 
-**面向 DeepSeek Harness 的上下文准入与披露控制层**
+**DeepSeek Harness（DSH）上下文管理与 token 优化插件**
 
 在工具结果、历史上下文和技能目录进入主模型请求之前做判断，
 只放行对当前任务有用的部分，原文全部归档、随时可取回。
+
+为 LLM Agent 提供上下文管理（Context Management）：工具输出过滤（Tool Output Filtering）、历史上下文裁剪与技能按需披露（Progressive Skill Disclosure），减少主模型反复读取无关内容。
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](tsconfig.base.json)
