@@ -34,6 +34,9 @@ const version = sieve.manifest.version
 check(web.manifest.version === version, `both packages are version ${version}`)
 check(web.manifest.peerDependencies['dsh-sieve'] === version, `dsh-sieve-web peers on dsh-sieve ${version}`)
 
+// TypeScript does not delete output for removed source modules.
+for (const { path } of packages) rmSync(join(path, 'lib'), { recursive: true, force: true })
+
 run('pnpm', ['build'], { cwd: root, stdio: ['ignore', 'inherit', 'inherit'] })
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })

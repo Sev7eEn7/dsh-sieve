@@ -1,6 +1,6 @@
 {
   "name": "dsh-sieve",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Context admission and disclosure layer for DeepSeek Harness: tool output admission, history forgetting, skill catalog disclosure",
   "license": "MIT",
   "keywords": [

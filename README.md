@@ -63,7 +63,7 @@ For AI coding agents running on DeepSeek Harness, especially tasks with verbose 
 1. Install the plugin (the web profile also gets the panel):
 
    ```bash
-   dsh plugin --profile web add dsh-sieve@0.1.0 dsh-sieve-web@0.1.0
+   dsh plugin --profile web add dsh-sieve@0.2.0 dsh-sieve-web@0.2.0
    ```
 
 2. Configure a judge model, one of:
@@ -292,30 +292,30 @@ No. A judge request carries only the content being judged and the task goal (red
 
 | sieve | DeepSeek Harness | Node.js |
 |---|---|---|
-| `0.1.0` | `0.2.1-alpha.1` | `^22.19.0 \|\| >=24.0.0` |
+| `0.2.0` | `0.2.1-alpha.1` | `^22.19.0 \|\| >=24.0.0` |
 
 ### Option 1: npm (recommended)
 
 Prebuilt packages: nothing compiles on your machine and no build scripts need approval. Install the plugin and the Web panel together:
 
 ```bash
-dsh plugin --profile web add dsh-sieve@0.1.0 dsh-sieve-web@0.1.0
+dsh plugin --profile web add dsh-sieve@0.2.0 dsh-sieve-web@0.2.0
 ```
 
 Profiles without a Web UI, such as `headless`, install only the plugin:
 
 ```bash
-dsh plugin --profile headless add dsh-sieve@0.1.0
+dsh plugin --profile headless add dsh-sieve@0.2.0
 ```
 
-You can also open **Plugins → Add plugin** in the DSH Web sidebar and enter `dsh-sieve@0.1.0`, then `dsh-sieve-web@0.1.0`; the result is the same.
+You can also open **Plugins → Add plugin** in the DSH Web sidebar and enter `dsh-sieve@0.2.0`, then `dsh-sieve-web@0.2.0`; the result is the same.
 
 ### Option 2: GitHub Release
 
 If npm is unreachable or you want to pin the exact build, install the tarballs attached to the [Release](https://github.com/Sev7eEn7/sieve/releases). They are the same prebuilt packages. The release includes `SHA256SUMS` for verification:
 
 ```bash
-dsh plugin --profile web add https://github.com/Sev7eEn7/sieve/releases/download/v0.1.0/dsh-sieve-0.1.0.tgz https://github.com/Sev7eEn7/sieve/releases/download/v0.1.0/dsh-sieve-web-0.1.0.tgz
+dsh plugin --profile web add https://github.com/Sev7eEn7/sieve/releases/download/v0.2.0/dsh-sieve-0.2.0.tgz https://github.com/Sev7eEn7/sieve/releases/download/v0.2.0/dsh-sieve-web-0.2.0.tgz
 ```
 
 ### Option 3: Build from source
@@ -329,7 +329,7 @@ pnpm install && pnpm release:pack
 ```
 
 ```bash
-dsh plugin --profile web add ./release/dsh-sieve-0.1.0.tgz ./release/dsh-sieve-web-0.1.0.tgz
+dsh plugin --profile web add ./release/dsh-sieve-0.2.0.tgz ./release/dsh-sieve-web-0.2.0.tgz
 ```
 
 `pnpm release:pack` builds both packages, checks that versions and peers agree and that the output contains no `workspace:` or local paths, then writes the tarballs and `SHA256SUMS` to `release/`.

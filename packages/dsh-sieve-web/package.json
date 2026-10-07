@@ -1,6 +1,6 @@
 {
   "name": "dsh-sieve-web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DSH Web panel for dsh-sieve: context reduction, judge status and ledger records",
   "license": "MIT",
   "keywords": [
@@ -74,6 +74,6 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.5-alpha.1",
-    "dsh-sieve": "0.1.0"
+    "dsh-sieve": "0.2.0"
   }
 }

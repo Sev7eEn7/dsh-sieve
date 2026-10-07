@@ -63,7 +63,7 @@ Agent 循环里，主模型每一步都要重新读一遍完整上下文。决�
 1. 安装插件（Web profile 同时装面板）：
 
    ```bash
-   dsh plugin --profile web add dsh-sieve@0.1.0 dsh-sieve-web@0.1.0
+   dsh plugin --profile web add dsh-sieve@0.2.0 dsh-sieve-web@0.2.0
    ```
 
 2. 配置判断模型，二选一：
@@ -292,30 +292,30 @@ sieve 减少工具输出、历史结果和技能目录中被反复发送的冗�
 
 | sieve | DeepSeek Harness | Node.js |
 |---|---|---|
-| `0.1.0` | `0.2.1-alpha.1` | `^22.19.0 \|\| >=24.0.0` |
+| `0.2.0` | `0.2.1-alpha.1` | `^22.19.0 \|\| >=24.0.0` |
 
 ### 方式一：npm（推荐）
 
 预构建包，不需要在本机编译，也不需要授权构建脚本。插件本体与 Web 面板一起装：
 
 ```bash
-dsh plugin --profile web add dsh-sieve@0.1.0 dsh-sieve-web@0.1.0
+dsh plugin --profile web add dsh-sieve@0.2.0 dsh-sieve-web@0.2.0
 ```
 
 `headless` 等没有 Web 界面的 profile 只装本体：
 
 ```bash
-dsh plugin --profile headless add dsh-sieve@0.1.0
+dsh plugin --profile headless add dsh-sieve@0.2.0
 ```
 
-也可以在 DSH Web 侧边栏打开**插件 → 添加插件**，依次输入 `dsh-sieve@0.1.0`、`dsh-sieve-web@0.1.0` 安装，效果与命令行相同。
+也可以在 DSH Web 侧边栏打开**插件 → 添加插件**，依次输入 `dsh-sieve@0.2.0`、`dsh-sieve-web@0.2.0` 安装，效果与命令行相同。
 
 ### 方式二：GitHub Release
 
 npm 不可达或想锁定到构建产物时，直接装 [Release](https://github.com/Sev7eEn7/sieve/releases) 附带的 tgz，同样是预构建包。发布页附有 `SHA256SUMS` 供校验：
 
 ```bash
-dsh plugin --profile web add https://github.com/Sev7eEn7/sieve/releases/download/v0.1.0/dsh-sieve-0.1.0.tgz https://github.com/Sev7eEn7/sieve/releases/download/v0.1.0/dsh-sieve-web-0.1.0.tgz
+dsh plugin --profile web add https://github.com/Sev7eEn7/sieve/releases/download/v0.2.0/dsh-sieve-0.2.0.tgz https://github.com/Sev7eEn7/sieve/releases/download/v0.2.0/dsh-sieve-web-0.2.0.tgz
 ```
 
 ### 方式三：从源码构建
@@ -329,7 +329,7 @@ pnpm install && pnpm release:pack
 ```
 
 ```bash
-dsh plugin --profile web add ./release/dsh-sieve-0.1.0.tgz ./release/dsh-sieve-web-0.1.0.tgz
+dsh plugin --profile web add ./release/dsh-sieve-0.2.0.tgz ./release/dsh-sieve-web-0.2.0.tgz
 ```
 
 `pnpm release:pack` 会构建两个包，检查版本与 peer 一致、产物里没有 `workspace:` 和本机路径，然后把 tgz 和 `SHA256SUMS` 输出到 `release/`。
