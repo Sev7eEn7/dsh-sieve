@@ -2,13 +2,14 @@
  * Jev keys in DSH's credential store (`ctx.credentials`). The web panel writes
  * them; an `auto` judge resolves them on every call, as DSH's credential seam
  * intends, so a key saved, replaced or removed reaches the next judgment
- * without a restart. Values never leave the host: callers get presence and
- * source only.
+ * without a restart. Without a key an `auto` judge has nothing to judge
+ * with. Values never leave the host: callers get presence and source only.
  * @module
  */
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { CredentialInfo, CredentialRef } from '@deepseek-ai/dsh-credentials'
+import { JudgeError } from '../judge/errors.ts'
 import type { JudgeCall, JudgeLike, JudgeResult } from '../judge/judge.ts'
 import type { Questions } from '../judge/types.ts'
 import type { JevKeyInfo, JevService } from '../status.ts'
@@ -98,26 +99,28 @@ export async function storeJevKey(credentials: Credentials | undefined, service:
   else await credentials.set(ref, apiKey)
 }
 
-export interface JevOrFallbackOptions {
+export interface StoredJevOptions {
   readonly resolve: () => Promise<JevKey | undefined>
   readonly jev: (key: JevKey) => JudgeLike
-  readonly fallback: () => JudgeLike
 }
 
 /**
- * Judges with Jev when a key resolves at call time, otherwise with the
- * fallback judge. The result names the judge that actually answered.
+ * Judges with Jev when a key resolves at call time. Without one there is no
+ * judge to fall back to: the call fails as `auth`, and its decision keeps the
+ * original. Features check for a key before deciding, so this only happens
+ * when a key is removed mid-decision.
  */
-export class JevOrFallbackJudge implements JudgeLike {
+export class StoredJevJudge implements JudgeLike {
   readonly id = 'auto'
-  private readonly options: JevOrFallbackOptions
+  private readonly options: StoredJevOptions
 
-  constructor(options: JevOrFallbackOptions) {
+  constructor(options: StoredJevOptions) {
     this.options = options
   }
 
   async evaluate<const Qs extends Questions>(request: JudgeCall<Qs>): Promise<JudgeResult<Qs>> {
     const key = await this.options.resolve()
-    return (key === undefined ? this.options.fallback() : this.options.jev(key)).evaluate(request)
+    if (key === undefined) throw new JudgeError('auth', 'No Jev key is configured')
+    return this.options.jev(key).evaluate(request)
   }
 }

@@ -2,9 +2,9 @@
 import type { DecisionMode } from '../judge/decision.ts'
 import type { LedgerRecord } from '../judge/ledger.ts'
 import { DSH_TEXT_CHARS_PER_TOKEN } from '../status.ts'
-import type { SieveDecisionStatus, SieveLatency, SieveRecordSummary, SieveReduction, SieveRoute, SieveStatus, SieveUsageTotals } from '../status.ts'
+import type { SieveDecisionStatus, SieveLatency, SieveRecordSummary, SieveReduction, SieveStatus, SieveUsageTotals } from '../status.ts'
 import { DECISION_IDS } from './config.ts'
-import type { DecisionId, LlmRoute, ResolvedConfig } from './config.ts'
+import type { DecisionId, ResolvedConfig } from './config.ts'
 
 /** Records listed by default; the ledger keeps up to 1000 per session. */
 export const DEFAULT_RECENT_RECORDS = 20
@@ -24,7 +24,6 @@ export interface StatusInput {
   readonly contextTokens: number | null
   readonly modeOf: (id: DecisionId) => DecisionMode
   readonly overridden: (id: DecisionId) => boolean
-  readonly routeOf: (id: DecisionId) => LlmRoute | undefined
   readonly recent: number
 }
 
@@ -102,10 +101,6 @@ export function reductionOf(records: readonly LedgerRecord[], contextTokens: num
   return { chars, tokens, contextTokens, ratio: contextTokens === null ? null : whole === 0 ? 0 : tokens / whole, charsPerToken: DSH_TEXT_CHARS_PER_TOKEN }
 }
 
-function route(value: LlmRoute | undefined): SieveRoute | null {
-  return value === undefined ? null : { provider: value.provider, model: value.model }
-}
-
 export function buildStatus(input: StatusInput): SieveStatus {
   const { config, records } = input
   const decisions = DECISION_IDS.map((id): SieveDecisionStatus => {
@@ -116,7 +111,6 @@ export function buildStatus(input: StatusInput): SieveStatus {
       mode: input.modeOf(id),
       profileMode: config.modes.get(id) ?? config.defaultMode,
       overridden: input.overridden(id),
-      route: config.judge.type === 'llm' || config.judge.type === 'auto' ? route(input.routeOf(id)) : null,
       records: own.length,
       rules: own.filter(record => record.source === 'rules').length,
       judged: own.filter(record => record.source === 'judge').length,
@@ -129,10 +123,10 @@ export function buildStatus(input: StatusInput): SieveStatus {
   })
   const count = Math.min(MAX_RECENT_RECORDS, Math.max(0, Math.floor(input.recent)))
   return {
-    v: 2,
+    v: 3,
     sessionId: input.sessionId,
     live: input.live,
-    judge: { type: config.judge.type, timeoutMs: config.judge.type === 'off' ? null : config.judge.timeoutMs },
+    judge: { type: config.judge.type, timeoutMs: config.judge.timeoutMs },
     recording: input.recording,
     testLog: config.admission.testLog,
     reducedResults: input.reducedResults,

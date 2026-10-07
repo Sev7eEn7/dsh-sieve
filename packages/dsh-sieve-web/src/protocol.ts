@@ -32,7 +32,7 @@ export interface KeyRequest extends PanelRequest {
 
 /** Everything the panel shows. */
 export interface PanelView {
-  readonly v: 2
+  readonly v: 3
   /** Whether an agent of the session is loaded on the host; the context size needs one. */
   readonly live: boolean
   readonly reduction: SieveReduction
@@ -40,7 +40,7 @@ export interface PanelView {
 }
 
 /** The view version this panel reads; a host on another version is reported, not guessed at. */
-export const PANEL_VERSION: PanelView['v'] = 2
+export const PANEL_VERSION: PanelView['v'] = 3
 
 /** Shortest and longest key accepted; both services issue keys well inside this range. */
 export const API_KEY_LENGTH = { min: 8, max: 512 } as const

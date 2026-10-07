@@ -1,8 +1,9 @@
 /**
  * dsh-sieve: token-saving judgment plugins for DeepSeek Harness, ported from mu.
  *
- * The `sieve` service binds the judgment kernel to profile configuration,
- * session-scoped model routes and the durable ledger. The MVP admits tool
+ * The `sieve` service binds the judgment kernel to profile configuration, a
+ * dedicated judge model (Jev or Laya; never the session's own model) and the
+ * durable ledger. Without a judge model it changes nothing. The MVP admits tool
  * output through bounded post-execute judgments and archived originals;
  * history forgetting and task-based skill catalogs use native session events.
  *
@@ -17,7 +18,6 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import type {} from '@deepseek-ai/dsh-llm'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-token-meter'
@@ -27,14 +27,13 @@ import { Inflight } from './judge/inflight.ts'
 import { Judge } from './judge/judge.ts'
 import type { JudgeLike } from './judge/judge.ts'
 import type { LedgerAnnotation, LedgerRecord } from './judge/ledger.ts'
-import { LlmJudgeProvider } from './judge/providers/llm.ts'
+import { LayaJudgeProvider } from './judge/providers/laya.ts'
 import { SystemOneJudgeProvider } from './judge/providers/system-one.ts'
 import { environmentSecrets } from './judge/redact.ts'
 import { Config, resolveConfig } from './runtime/config.ts'
-import type { DecisionId, LlmRoute, ResolvedConfig } from './runtime/config.ts'
+import type { DecisionId, ResolvedConfig } from './runtime/config.ts'
 import { SessionLedgers, ledgerDomain } from './runtime/ledger.ts'
-import { agentRoute, llmCompletion } from './runtime/llm-completion.ts'
-import { JEV_BASE_URLS, JevOrFallbackJudge, describeJevKeys, resolveJevKey, storeJevKey } from './runtime/jev.ts'
+import { JEV_BASE_URLS, StoredJevJudge, describeJevKeys, resolveJevKey, storeJevKey } from './runtime/jev.ts'
 import type { JevKey } from './runtime/jev.ts'
 import { registerAdmission } from './features/admission.ts'
 import { registerForgetting } from './features/forgetting.ts'
@@ -46,9 +45,8 @@ import { registerSieveCommand } from './commands/sieve.ts'
 
 export * as judge from './judge/index.ts'
 export { Config, DECISION_IDS, resolveConfig } from './runtime/config.ts'
-export type { DecisionId, JudgeConfig, JudgeType, LlmRoute, ResolvedConfig, ResolvedJudge } from './runtime/config.ts'
+export type { DecisionId, JudgeConfig, JudgeType, ResolvedConfig, ResolvedJudge } from './runtime/config.ts'
 export { LEDGER_SESSION_CAP, ledgerDomain } from './runtime/ledger.ts'
-export { agentRoute } from './runtime/llm-completion.ts'
 export { DEFAULT_RECENT_RECORDS, MAX_RECENT_RECORDS } from './runtime/status.ts'
 export { JEV_BASE_URLS, JEV_KEY_REFS, JEV_SERVICES, JevKeyError } from './runtime/jev.ts'
 export { DSH_TEXT_CHARS_PER_TOKEN } from './status.ts'
@@ -60,30 +58,27 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-/** One session's view of sieve: the key of its ledger and, for an llm judge, its model route. */
+/** One session's view of sieve: the key of its ledger. */
 export interface SessionScope {
   readonly sessionId: SessionId
-  /** The session's current route; used when the judge config names none. */
-  readonly route?: (() => LlmRoute | undefined) | undefined
 }
 
 /** How long unloading waits past the judge deadline for calls that ignore their abort. */
 const SETTLE_MARGIN_MS = 1000
 
 export class Sieve extends Service {
-  static inject = ['llm']
   static Config = Config
 
   readonly config: ResolvedConfig
   private ledgers: SessionLedgers | undefined
   /** Runtime mode overrides per session; a session without any has no entry. */
   private readonly overrides = new Map<SessionId, Map<DecisionId, DecisionMode>>()
-  private readonly routes = new Map<SessionId, Map<DecisionId, LlmRoute>>()
   private readonly revisions = new Map<SessionId, number>()
   private readonly lifetime = new AbortController()
   /** Every decision and provider call still running, so unloading can wait for them. */
   private readonly inflight = new Inflight()
-  private readonly systemOne: JudgeLike | undefined
+  /** The judge of a `system-one` or `laya` profile; `auto` builds one per call from the stored key. */
+  private readonly configured: JudgeLike | undefined
   /** Jev keys resolved from the credential store, so judged states never carry them. */
   private readonly jevSecrets = new Set<string>()
 
@@ -106,18 +101,19 @@ export class Sieve extends Service {
       if (agents === undefined || agents.size === 0) {
         live.delete(id)
         this.overrides.delete(id)
-        this.routes.delete(id)
         this.revisions.delete(id)
       }
     })
     const judge = this.config.judge
-    this.systemOne = judge.type === 'system-one'
-      ? new Judge({
-        provider: new SystemOneJudgeProvider({ apiKey: judge.apiKey, baseUrl: judge.baseUrl, model: judge.model }),
+    this.configured = judge.type === 'auto'
+      ? undefined
+      : new Judge({
+        provider: judge.type === 'laya'
+          ? new LayaJudgeProvider({ baseUrl: judge.baseUrl })
+          : new SystemOneJudgeProvider({ apiKey: judge.apiKey, baseUrl: judge.baseUrl, model: judge.model }),
         timeoutMs: judge.timeoutMs,
         inflight: this.inflight,
       })
-      : undefined
 
     // Unloading aborts in-flight judge calls (their decisions fall back) and waits for them to stop.
     // Cordis runs disposers concurrently, so the ledger's disposer below waits for the same calls.
@@ -188,23 +184,13 @@ export class Sieve extends Service {
     return this.revisions.get(sessionId) ?? 0
   }
 
-  routeOf(agent: Agent, id: DecisionId): LlmRoute | undefined {
-    return this.routeFor(agent.session.header.id, id, () => agentRoute(agent))
-  }
-
-  setRoute(sessionId: SessionId, id: DecisionId, route: LlmRoute | undefined): void {
-    if (this.config.judge.type !== 'llm' && this.config.judge.type !== 'auto') throw new Error('当前 judge 不是 llm 或 auto，不能设置模型路由')
-    this.revisions.set(sessionId, this.revisionOf(sessionId) + 1)
-    if (route === undefined) {
-      const routes = this.routes.get(sessionId)
-      routes?.delete(id)
-      if (routes?.size === 0) this.routes.delete(sessionId)
-    } else {
-      if (route.provider.trim() === '' || route.model.trim() === '') throw new Error('provider 和 model 不能为空')
-      const routes = this.routes.get(sessionId) ?? new Map<DecisionId, LlmRoute>()
-      routes.set(id, Object.freeze({ ...route }))
-      this.routes.set(sessionId, routes)
-    }
+  /**
+   * Whether a judge model is configured: Jev or Laya in the profile, or, for
+   * `auto`, a Jev key in the credential store now. Without one sieve changes
+   * nothing, rules included; the session model never stands in.
+   */
+  async judgeReady(): Promise<boolean> {
+    return this.config.judge.type !== 'auto' || await this.resolveJev() !== undefined
   }
 
   track<T>(work: Promise<T>): Promise<T> {
@@ -217,9 +203,9 @@ export class Sieve extends Service {
   }
 
   /**
-   * One session's state as JSON: modes, routes, ledger totals and its latest
-   * records. Without a live agent the session's own route and the log marker
-   * count are unknown, and no override can exist.
+   * One session's state as JSON: modes, ledger totals and its latest
+   * records. Without a live agent the log marker count is unknown, and no
+   * override can exist.
    */
   status(sessionId: SessionId, options: { readonly recent?: number } = {}): SieveStatus {
     const agent = this.ctx.get('agents')?.get(sessionId)
@@ -236,7 +222,6 @@ export class Sieve extends Service {
       contextTokens: agent === undefined ? null : this.contextTokens(agent),
       modeOf: id => this.modeOf(id, sessionId),
       overridden: id => this.overrides.get(sessionId)?.has(id) ?? false,
-      routeOf: id => this.routeFor(sessionId, id, agent === undefined ? undefined : () => agentRoute(agent)),
       recent: options.recent ?? DEFAULT_RECENT_RECORDS,
     })
   }
@@ -246,11 +231,11 @@ export class Sieve extends Service {
     const judge = this.config.judge
     const keys = await describeJevKeys(this.ctx.get('credentials'))
     const stored = keys.find(key => key.configured)
-    const using: SieveJudgeStatus['using'] = judge.type === 'off'
-      ? { kind: 'off' }
+    const using: SieveJudgeStatus['using'] = judge.type === 'laya'
+      ? { kind: 'laya' }
       : judge.type === 'system-one'
         ? { kind: 'jev', service: judge.baseUrl === undefined ? 'typesafe' : judge.baseUrl === JEV_BASE_URLS.openrouter ? 'openrouter' : null }
-        : judge.type === 'auto' && stored !== undefined ? { kind: 'jev', service: stored.service } : { kind: 'llm' }
+        : stored !== undefined ? { kind: 'jev', service: stored.service } : { kind: 'none' }
     return { type: judge.type, using, keys }
   }
 
@@ -280,7 +265,7 @@ export class Sieve extends Service {
   /** A decision engine for one session: the configured judge, the current modes, the session's ledger. */
   engine(scope: SessionScope): DecisionEngine {
     return new DecisionEngine({
-      judge: specId => this.judgeFor(scope, specId as DecisionId),
+      judge: () => this.judgeFor(),
       mode: specId => this.modeOf(specId, scope.sessionId),
       ledger: { append: record => this.ledgers?.append(scope.sessionId, record) },
       recordState: this.config.recordState,
@@ -290,39 +275,21 @@ export class Sieve extends Service {
     })
   }
 
-  /** The same for an agent: its session's ledger, and its own route when the config names none. */
+  /** The same for an agent: its session's ledger. */
   engineFor(agent: Agent): DecisionEngine {
-    return this.engine({ sessionId: agent.session.header.id, route: () => agentRoute(agent) })
+    return this.engine({ sessionId: agent.session.header.id })
   }
 
-  /** An llm judge's route: the session override, the profile's per-decision route, the judge route, else `fallback`. */
-  private routeFor(sessionId: SessionId, id: DecisionId, fallback: (() => LlmRoute | undefined) | undefined): LlmRoute | undefined {
+  private judgeFor(): JudgeLike {
     const judge = this.config.judge
-    if (judge.type !== 'llm' && judge.type !== 'auto') return undefined
-    return this.routes.get(sessionId)?.get(id) ?? this.config.routes.get(id) ?? judge.route ?? fallback?.()
-  }
-
-  private judgeFor(scope: SessionScope, id: DecisionId): JudgeLike | undefined {
-    const judge = this.config.judge
-    if (judge.type === 'off') return undefined
-    if (judge.type === 'system-one') return this.systemOne
-    const llm = (): JudgeLike => {
-      const complete = llmCompletion(this.ctx, {
-        route: () => this.routeFor(scope.sessionId, id, scope.route),
-        maxTokens: judge.maxOutputTokens,
-        sessionId: scope.sessionId,
-      })
-      return new Judge({ provider: new LlmJudgeProvider({ id: 'llm', complete }), timeoutMs: judge.timeoutMs, inflight: this.inflight })
-    }
-    if (judge.type === 'llm') return llm()
-    return new JevOrFallbackJudge({
+    if (this.configured !== undefined) return this.configured
+    return new StoredJevJudge({
       resolve: () => this.resolveJev(),
       jev: key => new Judge({
         provider: new SystemOneJudgeProvider({ apiKey: key.apiKey, baseUrl: JEV_BASE_URLS[key.service] }),
         timeoutMs: judge.timeoutMs,
         inflight: this.inflight,
       }),
-      fallback: llm,
     })
   }
 
@@ -348,7 +315,7 @@ export class Sieve extends Service {
   /** Waits for running decisions and provider calls, bounded by the judge deadline plus a margin. */
   private async settle(): Promise<void> {
     const judge = this.config.judge
-    const bound = (judge.type === 'off' ? 0 : judge.timeoutMs) + SETTLE_MARGIN_MS
+    const bound = judge.timeoutMs + SETTLE_MARGIN_MS
     if (await this.inflight.settle(bound)) return
     this.ctx.logger.warn(`sieve: ${this.inflight.size} judge call(s) still running ${bound} ms after unload began; no longer waiting`)
   }

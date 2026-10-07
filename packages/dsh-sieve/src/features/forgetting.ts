@@ -181,6 +181,8 @@ export function registerForgetting(ctx: Context, host: AdmissionHost, runtime: S
   const batched = new WeakMap<Agent, { epoch: number, settings: number, ruled: Set<number>, asked: Set<number> }>()
   ctx.on('agent/pre-step', async ({ agent, messages, signal }, next) => {
     const run = async (): Promise<void> => {
+      // Checked first: the projection read below must not go stale across the await.
+      if (!await host.judgeReady()) return
       const state = ctx.sessionProjections.stateOf(agent.session, FORGET_STATE_KEY)
       const task = runtime.task(agent)
       const agentState = runtime.for(agent)

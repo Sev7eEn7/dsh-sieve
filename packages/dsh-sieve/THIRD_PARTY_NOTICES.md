@@ -16,7 +16,7 @@ sieve 的判断内核部分代码从 mu 的 `packages/kyrn-judge/`（包名 `@ky
 | `src/judge/engine.ts` | `src/decision.ts`（DecisionEngine 部分） | 改写 |
 | `src/judge/judge.ts` | `src/judge.ts` | 改写 |
 | `src/judge/ledger.ts` | `src/ledger.ts` | 改写 |
-| `src/judge/providers/llm.ts` | `src/providers/llm.ts` | 移植 |
+| `src/judge/providers/laya.ts` | `src/providers/local.ts` | 改写 |
 | `src/judge/providers/http.ts` | `src/providers/http.ts` | 移植 |
 | `src/judge/providers/mock.ts` | `src/providers/mock.ts` | 移植 |
 | `src/judge/providers/system-one.ts` | `src/providers/typesafe.ts` | 改写 |
@@ -33,7 +33,7 @@ sieve 的判断内核部分代码从 mu 的 `packages/kyrn-judge/`（包名 `@ky
 | `tests/judge/fixtures/test-log-cases.ts`、`tests/judge/fixtures/test-logs/*.txt` | `test/fixtures/test-log-cases.ts`、`test/fixtures/test-logs/*.txt` | 原样复制 |
 | `tests/judge/redact.spec.ts` | `test/redact.test.ts` | 移植 |
 | `tests/judge/engine.spec.ts` | `test/decision.test.ts`、`test/judge.test.ts` | 改写 |
-| `tests/judge/providers.spec.ts` | `test/cascade.test.ts`、`test/typesafe-provider.test.ts` | 改写 |
+| `tests/judge/providers.spec.ts` | `test/typesafe-provider.test.ts` | 改写 |
 | `tests/judge/decisions.spec.ts` | `test/features.test.ts` | 改写 |
 
 mu 仓库的许可证原文：

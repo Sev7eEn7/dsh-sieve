@@ -15,7 +15,7 @@ import type { DecisionId, JudgeType } from './runtime/config.ts'
 export type { DecisionId, DecisionMode, JudgeType }
 
 /** Bumped when a field changes meaning or a required one is added; readers reject other versions. */
-export type SieveStatusVersion = 2
+export type SieveStatusVersion = 3
 
 /** Text density of DSH's token meter heuristic (`dsh-token-meter` estimate.ts, `CHARS_PER_TOKEN`). */
 export const DSH_TEXT_CHARS_PER_TOKEN = 4
@@ -57,18 +57,13 @@ export interface JevKeyInfo {
 export interface SieveJudgeStatus {
   /** The profile's judge type. */
   readonly type: JudgeType
-  /** What the next judgment uses. */
+  /** What the next judgment uses; `none` (an `auto` judge without a Jev key) means sieve changes nothing. */
   readonly using:
     | { readonly kind: 'jev', readonly service: JevService | null }
-    | { readonly kind: 'llm' }
-    | { readonly kind: 'off' }
+    | { readonly kind: 'laya' }
+    | { readonly kind: 'none' }
   /** Stored keys; only an `auto` judge reads them. */
   readonly keys: readonly JevKeyInfo[]
-}
-
-export interface SieveRoute {
-  readonly provider: string
-  readonly model: string
 }
 
 export interface SieveUsageTotals {
@@ -95,8 +90,6 @@ export interface SieveDecisionStatus {
   readonly profileMode: DecisionMode
   /** Whether this session overrides the profile mode. */
   readonly overridden: boolean
-  /** llm judge only: the route this session's next judgment would use; null otherwise or when none resolves. */
-  readonly route: SieveRoute | null
   readonly records: number
   /** Records decided by deterministic rules, without a judge. */
   readonly rules: number
@@ -135,14 +128,14 @@ export interface SieveStatus {
   readonly v: SieveStatusVersion
   readonly sessionId: string
   /**
-   * Whether an agent of this session is loaded in this process. Mode and route
+   * Whether an agent of this session is loaded in this process. Mode
    * overrides live only as long as one is, and the log marker count needs one.
    */
   readonly live: boolean
   readonly judge: {
     readonly type: JudgeType
-    /** Deadline of one judge call; null without a judge. */
-    readonly timeoutMs: number | null
+    /** Deadline of one judge call. */
+    readonly timeoutMs: number
   }
   /** Whether the ledger is mounted; without it nothing below is recorded. */
   readonly recording: boolean

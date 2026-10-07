@@ -23,6 +23,8 @@ export interface AdmissionHost {
   annotate(sessionId: SessionId, ledgerId: string, patch: LedgerAnnotation): Promise<void>
   track<T>(work: Promise<T>): Promise<T>
   revisionOf(sessionId: SessionId): number
+  /** Whether a judge model (Jev or Laya) is configured; without one no decision changes anything. */
+  judgeReady(): Promise<boolean>
 }
 
 /**
@@ -91,7 +93,7 @@ export function registerAdmission(ctx: Context, host: AdmissionHost, runtime: Se
     const testLog = !content && command !== undefined && config.testLog !== 'off' && isTestLog(`bash: ${command}`, original)
     // The mode governs the rules as much as the judge: off leaves the output alone, shadow only measures.
     const mode = engine.modeOf(testLog ? testLogSelection.id : toolAdmissionBatch.id)
-    if (mode === 'off') return undefined
+    if (mode === 'off' || !await host.judgeReady()) return undefined
 
     /** A replacement must save at least this much, after its markers and pointer. */
     const floor = Math.max(config.minNetChars, original.length * config.minNetShare)

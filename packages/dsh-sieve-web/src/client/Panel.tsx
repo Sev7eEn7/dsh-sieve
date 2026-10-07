@@ -119,8 +119,8 @@ interface JevKeysProps {
 }
 
 function usingText(t: PanelTranslate, using: SieveJudgeStatus['using']): string {
-  if (using.kind === 'off') return t('jev.using.off')
-  if (using.kind === 'llm') return t('jev.using.llm')
+  if (using.kind === 'none') return t('jev.using.none')
+  if (using.kind === 'laya') return t('jev.using.laya')
   return using.service === null ? t('jev.using.jevUnknown') : t('jev.using.jev', { service: t(`jev.service.${using.service}`) })
 }
 

@@ -17,37 +17,35 @@ export type DecisionId = typeof DECISION_IDS[number]
 /** Node caps timers at 2^31 - 1 ms. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647
 
-export type JudgeType = 'auto' | 'llm' | 'system-one' | 'off'
+export type JudgeType = 'auto' | 'system-one' | 'laya'
 
+/**
+ * sieve runs only with a dedicated judge model, Jev or Laya; the session's own
+ * model never stands in (user decision, 2026-10-08). Without one, no decision
+ * changes anything, rules included.
+ */
 export interface JudgeConfig {
   /**
-   * `auto` (default): Jev over System One when DSH's credential store holds a
-   * Jev key (see `runtime/jev.ts`), resolved per call; otherwise as `llm`.
-   * `llm`: a model route through DSH `ctx.llm`, no extra account.
+   * `auto` (default): Jev over System One with the key DSH's credential store
+   * holds (see `runtime/jev.ts`), resolved per call; no key, no judgment.
    * `system-one`: Jev over HTTP (TypeSafe or OpenRouter), needs `apiKey`.
-   * `off`: no judge; every decision takes its fallback.
+   * `laya`: the local Laya sidecar mu starts (`mu judge start`), no key.
    */
   type: JudgeType
-  /** llm and auto: provider route, together with `model`; leave both out to use the session's own route. */
-  provider?: string
-  /** llm and auto: model id for `provider`. system-one: judge model, default `jev-latest`. */
+  /** system-one: judge model, default `jev-latest`. */
   model?: string
-  /** system-one: endpoint, default TypeSafe's. */
+  /** system-one: endpoint, default TypeSafe's. laya: the sidecar, default `http://127.0.0.1:47823`. */
   baseUrl?: string
   /** system-one: the key, e.g. `!!js process.env.TYPESAFE_API_KEY`. */
   apiKey?: string
   /** Deadline of one judge call, end to end. */
   timeoutMs: number
-  /** llm: output token cap of one judge call. */
-  maxOutputTokens: number
 }
 
 export interface Config {
   judge: JudgeConfig
   /** Mode per decision id; `default` (itself `active` unless set) covers the rest. */
   modes: Record<string, DecisionMode>
-  /** Explicit per-decision llm routes (judge `llm` or `auto`); mixed backend types are not supported. */
-  routes: Record<string, LlmRoute>
   /** Store submitted judge states in the ledger. Off by default because states can hold user content. */
   recordState: boolean
   admission: AdmissionConfig
@@ -104,16 +102,13 @@ export interface AdmissionConfig {
 
 export const Config: z<Config> = z.object({
   judge: z.object({
-    type: z.union(['auto', 'llm', 'system-one', 'off'] as const).default('auto'),
-    provider: z.string(),
+    type: z.union(['auto', 'system-one', 'laya'] as const).default('auto'),
     model: z.string(),
     baseUrl: z.string(),
     apiKey: z.string(),
     timeoutMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(4000),
-    maxOutputTokens: z.natural().min(1).default(1024),
   }).default({}),
   modes: z.dict(z.union(DECISION_MODES)).default({}),
-  routes: z.dict(z.object({ provider: z.string().required(), model: z.string().required() })).default({}),
   recordState: z.boolean().default(false),
   admission: z.object({
     enabled: z.boolean().default(true),
@@ -150,20 +145,11 @@ export const Config: z<Config> = z.object({
   }).default({}),
 })
 
-export interface LlmRoute {
-  readonly provider: string
-  readonly model: string
-}
-
 export type ResolvedJudge =
-  | { readonly type: 'off' }
   | {
-    /** `auto` judges with Jev when a stored key resolves at call time, else exactly as `llm`. */
-    readonly type: 'llm' | 'auto'
-    /** Undefined: the session's own route at call time. */
-    readonly route: LlmRoute | undefined
+    /** Jev with the credential store's key, resolved per call. */
+    readonly type: 'auto'
     readonly timeoutMs: number
-    readonly maxOutputTokens: number
   }
   | {
     readonly type: 'system-one'
@@ -172,12 +158,16 @@ export type ResolvedJudge =
     readonly model: string | undefined
     readonly timeoutMs: number
   }
+  | {
+    readonly type: 'laya'
+    readonly baseUrl: string | undefined
+    readonly timeoutMs: number
+  }
 
 export interface ResolvedConfig {
   readonly judge: ResolvedJudge
   readonly defaultMode: DecisionMode
   readonly modes: ReadonlyMap<DecisionId, DecisionMode>
-  readonly routes: ReadonlyMap<DecisionId, LlmRoute>
   readonly recordState: boolean
   readonly admission: Readonly<Omit<AdmissionConfig, 'passThrough' | 'contentTools'>> & { readonly passThrough: readonly string[], readonly contentTools: readonly string[] }
   readonly forgetting: Readonly<ForgettingConfig>
@@ -196,24 +186,21 @@ function nonEmpty(value: string | undefined): string | undefined {
  * @returns the immutable configuration sieve runs on.
  */
 export function resolveConfig(config: Partial<Config> | undefined): ResolvedConfig {
+  // The schema drops unknown keys; a profile written for the removed session-model judge must not load as if it worked.
+  const raw = (config ?? {}) as Record<string, unknown>
+  const rawJudge = typeof raw['judge'] === 'object' && raw['judge'] !== null ? raw['judge'] as Record<string, unknown> : {}
+  if (rawJudge['type'] === 'llm' || rawJudge['type'] === 'off' || 'routes' in raw || 'provider' in rawJudge || 'maxOutputTokens' in rawJudge) {
+    throw new Error('sieve: the session-model judge was removed (judge.type llm or off, judge.provider, judge.maxOutputTokens, routes); configure Jev or Laya')
+  }
+
   const value = Config((config ?? {}) as Config)
   const judge = value.judge
 
   let resolved: ResolvedJudge
-  if (judge.type === 'off') {
-    resolved = { type: 'off' }
-  } else if (judge.type === 'llm' || judge.type === 'auto') {
-    const provider = nonEmpty(judge.provider)
-    const model = nonEmpty(judge.model)
-    if ((provider === undefined) !== (model === undefined)) {
-      throw new Error('sieve: judge.provider and judge.model must be set together')
-    }
-    resolved = {
-      type: judge.type,
-      route: provider === undefined || model === undefined ? undefined : { provider, model },
-      timeoutMs: judge.timeoutMs,
-      maxOutputTokens: judge.maxOutputTokens,
-    }
+  if (judge.type === 'auto') {
+    resolved = { type: 'auto', timeoutMs: judge.timeoutMs }
+  } else if (judge.type === 'laya') {
+    resolved = { type: 'laya', baseUrl: nonEmpty(judge.baseUrl), timeoutMs: judge.timeoutMs }
   } else {
     const apiKey = nonEmpty(judge.apiKey)
     if (apiKey === undefined) throw new Error('sieve: judge.type system-one needs judge.apiKey')
@@ -227,13 +214,6 @@ export function resolveConfig(config: Partial<Config> | undefined): ResolvedConf
   }
 
   const modes = new Map<DecisionId, DecisionMode>()
-  const routes = new Map<DecisionId, LlmRoute>()
-  for (const [key, route] of Object.entries(value.routes)) {
-    if (!DECISION_IDS.includes(key as DecisionId)) throw new Error(`sieve: unknown decision "${key}" in routes`)
-    if (resolved.type !== 'llm' && resolved.type !== 'auto') throw new Error('sieve: routes require judge.type llm or auto')
-    if (route.provider.trim() === '' || route.model.trim() === '') throw new Error('sieve: routes need nonempty provider and model')
-    routes.set(key as DecisionId, Object.freeze({ ...route }))
-  }
   if ('thresholds' in value.forgetting || 'minAgeTurns' in value.forgetting) {
     throw new Error('sieve: forgetting.thresholds and minAgeTurns were replaced by keepRecent and minBatchChars')
   }
@@ -250,7 +230,6 @@ export function resolveConfig(config: Partial<Config> | undefined): ResolvedConf
     // Active unless the profile says otherwise (user decision, 2026-10-06).
     defaultMode: value.modes['default'] ?? 'active',
     modes,
-    routes,
     recordState: value.recordState,
     admission: Object.freeze({
       ...value.admission,

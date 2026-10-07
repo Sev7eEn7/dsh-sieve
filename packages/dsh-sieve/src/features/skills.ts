@@ -94,7 +94,7 @@ export function registerSkills(ctx: Context, host: AdmissionHost, runtime: Sessi
       const config = host.config.skillDisclosure
       const engine = runtime.for(agent).engine
       const mode = engine.modeOf(skillDisclosure.id)
-      if (mode === 'off') return decision
+      if (mode === 'off' || !await host.judgeReady()) return decision
       const index = decision.messages.findIndex(message => message.source.kind === 'skill-catalog')
       const catalog = decision.messages[index]
       if (catalog?.source.kind !== 'skill-catalog') return decision
