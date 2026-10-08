@@ -1,15 +1,13 @@
 /**
  * Laya, the open-weight typed decision model, served on this machine by the
- * sidecar mu starts (`mu judge setup`, then `mu judge start`; macOS on Apple
- * Silicon, Core ML). Request and answers have the kernel's own shapes; nothing
- * leaves the machine and there is no key.
+ * local sidecar (macOS on Apple Silicon, Core ML). Request and answers have
+ * the kernel's own shapes; nothing leaves the machine and there is no key.
  *
  * The sidecar reads a bounded window (1024 tokens for the default checkpoint,
  * shared by the question, its options and the state) and keeps the head of the
  * state; what it cuts comes back as warnings.
  *
- * Adapted from mu `packages/kyrn-judge/src/providers/local.ts` (MIT, see
- * THIRD_PARTY_NOTICES.md), without the custom path, id and header options.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
  * @module
  */
 
@@ -20,7 +18,7 @@ import { MAX_ERROR_MESSAGE_LENGTH, messageFromErrorBody, readWarnings } from './
 export const LAYA_BASE_URL = 'http://127.0.0.1:47823'
 
 export interface LayaJudgeProviderOptions {
-  /** The sidecar; empty is mu's default address. */
+  /** The sidecar; empty is its default address. */
   readonly baseUrl?: string | undefined
   readonly fetch?: typeof fetch | undefined
 }
@@ -63,7 +61,7 @@ export class LayaJudgeProvider implements JudgeProvider {
     } catch (error) {
       // The kernel classifies aborts: it knows whether its timeout or the caller fired.
       if (request.signal?.aborted) throw error
-      throw new JudgeError('unreachable', `Laya is not reachable at ${this.baseUrl}; start it with: mu judge start`, { cause: error })
+      throw new JudgeError('unreachable', `Laya is not reachable at ${this.baseUrl}; start the local Laya server`, { cause: error })
     }
 
     if (!response.ok) {

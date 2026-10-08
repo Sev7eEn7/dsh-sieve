@@ -24,17 +24,13 @@
  * text points at it. The caller also decides what reaches this module: runner
  * output only (`isTestLog`), and nothing the user asked to see in full.
  *
- * Ported from mu `packages/kyrn-judge/src/admission/test-log.ts` (MIT, see
- * THIRD_PARTY_NOTICES.md). Question wording is unchanged; the omission bar is
- * 0.8 instead of 0.9, and the rules arm also takes passing runs.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
+ * The omission bar is 0.8, and the rules arm also takes passing runs.
  * Recognition additionally covers pytest aliases, Django's runner, Python
  * commands that name a test module or script, quiet, sugar and unittest
  * summaries, and unittest's verbose passing lines; candidate previews retain
  * evidence when a line exceeds their budget.
- * The judge arm is named `judge` instead of `jev` and
- * builds on the rules arm instead of on exact duplicates only, and markers say
- * `sieve` instead of `mu`. mu's `full` arm and its reference `policy` wording
- * are not ported.
+ * The judge arm builds on the rules arm instead of on exact duplicates only.
  * @module
  */
 
@@ -485,8 +481,8 @@ interface SelectionInput {
 }
 
 /**
- * Asks whether the candidate is needed on top of what stays anyway (mu's
- * `suffices` wording). Measured in mu against four other wordings: asking
+ * Asks whether the candidate is needed on top of what stays anyway (the
+ * `suffices` wording). Measured against four other wordings: asking
  * whether a candidate "contains what the goal asks about" made the judge
  * hesitate on verdict-only goals, because passing lines are on topic even when
  * the summary answers the question.

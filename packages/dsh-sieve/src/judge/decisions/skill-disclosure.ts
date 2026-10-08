@@ -7,8 +7,7 @@
  * tool still loads it. The first catalog is decided on the first message, when
  * there is no cached prefix to lose.
  *
- * Ported from mu `packages/kyrn-judge/src/decisions/skill-disclosure.ts` (MIT,
- * see THIRD_PARTY_NOTICES.md); wording, id and version unchanged.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
  * @module
  */
 

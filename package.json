@@ -2,7 +2,7 @@
   "name": "sieve",
   "private": true,
   "type": "module",
-  "description": "Token-saving judgment plugins for DeepSeek Harness, ported from mu",
+  "description": "Token-saving judgment plugins for DeepSeek Harness",
   "packageManager": "pnpm@11.21.0",
   "engines": {
     "node": "^22.19.0 || >=24.0.0"
@@ -13,7 +13,6 @@
     "test": "vitest --run",
     "smoke:package": "node scripts/packaging-smoke.mjs",
     "release:pack": "node scripts/release-pack.mjs",
-    "import:mu": "node scripts/import-mu.mjs",
     "measure": "node --env-file-if-exists=.env scripts/measure.mjs"
   },
   "devDependencies": {

@@ -4,8 +4,8 @@
  * the spec's fallback. Every judged decision is written to the ledger with its
  * complete usage.
  *
- * Rewritten for sieve after mu `packages/kyrn-judge/src/decision.ts` (MIT,
- * see THIRD_PARTY_NOTICES.md). The engine holds no mode table and no judge
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
+ * The engine holds no mode table and no judge
  * registry: the host answers `mode(specId)` and `judge(specId)` from its
  * configuration, so a mode change or a new route needs no engine of its own.
  * @module

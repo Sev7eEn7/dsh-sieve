@@ -1,7 +1,6 @@
 /**
- * Admission gates adapted from mu packages/kyrn-judge/src/extension/features/admission.ts (MIT).
- * Copyright (c) 2025 Mario Zechner
- * See THIRD_PARTY_NOTICES.md for the source commit and license.
+ * Admission gates.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
  *
  * Two rules that need no judge, written for sieve: runs of lines that differ
  * at most in numbers fold to their ends, and runs that repeat text the model

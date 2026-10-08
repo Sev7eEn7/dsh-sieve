@@ -1,8 +1,6 @@
 /**
- * Task-based skill catalog disclosure, rewritten for DSH after mu
- * packages/kyrn-judge/src/extension/features/skills.ts (MIT).
- * Copyright (c) 2025 Mario Zechner
- * See THIRD_PARTY_NOTICES.md for the source commit and license.
+ * Task-based skill catalog disclosure.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'

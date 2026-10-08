@@ -130,7 +130,7 @@ flowchart LR
 | 判断模型 | 说明 | 需要 |
 |---|---|---|
 | **Jev** | TypeSafe 的结构化判断模型，通过 System One 协议原生回答是/否题和单选题，并返回每个回答的概率。可走 TypeSafe 官方端点或 OpenRouter，按 TypeSafe 计费（[官方价格](https://docs.typesafe.ai/models)） | TypeSafe 或 OpenRouter 的 API 密钥 |
-| **Laya** | 开放权重的类型化判断模型（mmBERT-base，322M），在本机 Core ML 上运行，请求不出本机、不收费。窗口只有 1024 token，长状态会被截断；在复杂问题上明显弱于 Jev | macOS Apple Silicon，mu 提供的本地服务 |
+| **Laya** | 开放权重的类型化判断模型（mmBERT-base，322M），在本机 Core ML 上运行，请求不出本机、不收费。窗口只有 1024 token，长状态会被截断；在复杂问题上明显弱于 Jev | macOS Apple Silicon，本机运行 Laya 服务 |
 
 **不用会话模型。** 判断只发给 Jev 或 Laya。sieve 不会把判断题交给当前会话的主模型，也不提供这样的配置项；旧版 profile 中的 `judge.type: llm`、`judge.type: off`、`judge.provider`、`routes` 会在加载时报错。
 
@@ -155,21 +155,80 @@ flowchart LR
 
 ### 使用 Laya
 
-Laya 的本地服务由 [mu](https://github.com/qybaihe/mu) 提供，只支持 macOS Apple Silicon。sieve 只连接这个服务，不负责安装和启动它。
+Laya 运行在本机，只支持 macOS 15 及以上的 Apple Silicon（Core ML）。sieve 只通过本地 HTTP 连接 Laya 服务，默认地址 `127.0.0.1:47823`；sieve 不自带服务，也不负责安装和启动。搭建一个服务需要三部分：
 
-```bash
-npm i -g mu-agent
+1. **推理库**：[`laya-coreml`](https://github.com/mizorewww/laya-coreml)（Apache-2.0），[Laya](https://github.com/NandhaKishorM/laya) 的 Core ML 移植，不依赖 PyTorch。用 [uv](https://docs.astral.sh/uv/) 安装：
+
+   ```bash
+   uv venv --python 3.12 ~/.laya/.venv
+   ```
+
+   ```bash
+   uv pip install --python ~/.laya/.venv/bin/python --index-url https://pypi.org/simple laya-coreml==0.1.0
+   ```
+
+2. **权重**：Hugging Face 上的检查点 `aac6fef/laya-multilingual-coreml`（mmBERT-base，322M，FP16，约 680 MB）。下载后按包内清单校验：
+
+   ```bash
+   ~/.laya/.venv/bin/python - <<'PY'
+   import json
+   from pathlib import Path
+   from huggingface_hub import snapshot_download
+   from laya_coreml.artifacts import verify_files
+
+   target = Path.home() / ".laya/models/laya-multilingual-coreml"
+   snapshot_download("aac6fef/laya-multilingual-coreml", local_dir=target, allow_patterns=[
+       "coreml_config.json", "rl_agent_config.json", "encoder/config.json", "tokenizer/*",
+       "model.mlpackage/**", "host_weights.safetensors", "README.md", "LICENSE*", "NOTICE*"])
+   files = json.loads((target / "coreml_config.json").read_text())["files"]
+   verify_files(target, files)
+   print(f"verified {len(files)} files")
+   PY
+   ```
+
+   在 Python 中，`laya_coreml.load(model_dir, local_files_only=True)` 返回的模型用 `predict(state, questions)` 回答 Laya 自己的题型（`noul`、`choice`、`score`）。
+
+3. **HTTP 服务**：在这个模型外包一层本地服务，实现下面的协议。sieve 不提供服务实现，需要自己编写，或使用任何实现了同一协议的服务。
+
+<details>
+<summary>Laya 服务协议</summary>
+
+`POST /evaluate`，`Content-Type: application/json`：
+
+```json
+{
+  "state": "字符串、对象或数组",
+  "questions": {
+    "q1": { "type": "boolean", "instructions": "…", "criteria": { "true": "…", "false": "…" } },
+    "q2": { "type": "choice", "instructions": "…", "criteria": { "keep": "…", "drop": null } },
+    "q3": { "type": "score", "instructions": "…", "criteria": ["low", "mid", "high"] }
+  }
+}
 ```
 
-```bash
-mu judge setup
+`boolean` 对应 Laya 的 `noul`；`boolean` 题的 `criteria` 可省略，值为 `null` 的描述交给 Laya 时应置空或去掉。成功时返回 HTTP 200：
+
+```json
+{
+  "answers": {
+    "q1": { "type": "boolean", "probability": 0.93 },
+    "q2": { "type": "choice", "choice": "keep", "probabilities": { "keep": 0.81, "drop": 0.19 } },
+    "q3": { "type": "score", "score": 1.4, "probabilities": { "0": 0.1, "1": 0.4, "2": 0.5 } }
+  },
+  "usage": { "inputTokens": 980, "outputTokens": 0 },
+  "warnings": [{ "type": "state_truncated", "questionId": "q1", "message": "…" }],
+  "providerMetadata": { "laya": { "model": "laya:aac6fef/laya-multilingual-coreml", "answers": { "q1": { "confidence": 0.7 } } } }
+}
 ```
 
-```bash
-mu judge start
-```
+- 每道题都必须有同 `type` 的答案，否则 sieve 拒收整个响应。`probability` 是判为 true 的概率；`score` 是 `[0, 档数 - 1]` 内的小数位置。
+- `usage`、`warnings`、`providerMetadata` 可选。截断应通过 `warnings` 上报（sieve 会记入账本）；`providerMetadata.laya.model` 是账本里记录的模型名，`confidence` 须在 `[0, 1]` 内，否则忽略。
+- 出错时返回 4xx（请求有误）或 5xx（服务故障），响应体为 `{"error": {"message": "…"}}`；两种情况 sieve 都保留原文。
+- 协议没有鉴权，只监听本机回环地址。Core ML 模型不能并发调用，请求需串行处理。
 
-`setup` 建立 Python 环境并下载、校验权重（约 680 MB），`start` 在 `127.0.0.1:47823` 后台常驻。然后在 profile 中指定：
+</details>
+
+服务运行后，在 profile 中指定：
 
 ```yaml
 - id: sieve
@@ -182,7 +241,7 @@ mu judge start
 Laya 服务没有运行时，每次判断都会失败并保留原文，账本里记为 `error:unreachable`，规则部分照常运行。
 
 > [!NOTE]
-> Laya 的窗口是 1024 token，问题、选项和状态共用；超出部分从状态末尾截掉，并作为告警记入账本。mu 的实测显示它在简单谓词上可用，在需要综合判断的问题上接近随机。sieve 的四个决策尚未在 Laya 上做过效果测量，对判断质量有要求时用 Jev。
+> Laya 的窗口是 1024 token，问题、选项和状态共用；超出部分从状态末尾截掉，并作为告警记入账本。此前的实测显示它在简单谓词上可用，在需要综合判断的问题上接近随机。sieve 的四个决策尚未在 Laya 上做过效果测量，对判断质量有要求时用 Jev。
 
 ## 设计约束
 
@@ -440,6 +499,6 @@ packages/
 
 ## 致谢与许可
 
-判断内核与 Laya provider 的部分代码源自 [mu](https://github.com/qybaihe/mu)，来源路径与 commit 记录在 [THIRD_PARTY_NOTICES.md](packages/dsh-sieve/THIRD_PARTY_NOTICES.md)。
+部分代码源自以 MIT 许可发布的第三方代码，其版权声明与许可证原文见 [THIRD_PARTY_NOTICES.md](packages/dsh-sieve/THIRD_PARTY_NOTICES.md)。
 
 本项目以 [MIT](LICENSE) 许可发布。

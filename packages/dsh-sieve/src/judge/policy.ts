@@ -3,8 +3,7 @@
  * wrong-but-confident reading is the only way the judge can cause harm:
  * anything the model is unsure about falls through to the caller's default.
  *
- * Ported from mu `packages/kyrn-judge/src/policy.ts` (MIT, see
- * THIRD_PARTY_NOTICES.md); thresholds unchanged.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
  * @module
  */
 

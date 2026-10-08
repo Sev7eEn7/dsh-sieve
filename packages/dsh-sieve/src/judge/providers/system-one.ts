@@ -3,8 +3,7 @@
  * the same protocol, such as OpenRouter. Uses `fetch` directly; error messages
  * name the service, never the key or the submitted state.
  *
- * Adapted from mu `packages/kyrn-judge/src/providers/typesafe.ts` (MIT, see
- * THIRD_PARTY_NOTICES.md), without the CLM, key-optional and key-resolver variants.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
  * @module
  */
 

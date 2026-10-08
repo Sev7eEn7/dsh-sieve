@@ -6,18 +6,17 @@
  *
  * The first and the last chunk always stay, so the judge is asked only
  * whether a chunk is needed in addition, with the goal and the intent of the
- * call in view: the `suffices` wording of the test-log decision, which mu
- * chose over four other wordings. mu's version 3 asked what kind of output a
- * chunk is and dropped only progress, repeated warnings and passing checks;
- * sieve's rules now fold those without a judge, and mu's retrospective found
- * that question dropped 0 of 2,412 real chunks.
+ * call in view: the `suffices` wording of the test-log decision, chosen over
+ * four other wordings. Version 3 asked what kind of output a chunk is and
+ * dropped only progress, repeated warnings and passing checks; sieve's rules
+ * now fold those without a judge, and a retrospective found that question
+ * dropped 0 of 2,412 real chunks.
  *
  * Only a sure "not needed" drops a chunk. The caller archives whatever it
  * drops and leaves a pointer, which keeps a wrong verdict recoverable.
  *
- * Adapted from mu `packages/kyrn-judge/src/decisions/tool-admission.ts` (MIT,
- * see THIRD_PARTY_NOTICES.md); the id and the batch form are kept, the
- * question is new in version 4.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
+ * The question is new in version 4.
  * @module
  */
 
@@ -55,7 +54,7 @@ function outcomeOf(answer: Answer | undefined): AdmissionOutcome {
 /**
  * Many chunks of one output in a single request: the chunks sit in the state
  * as `c1`, `c2`, … and each has its own question. The state is billed once,
- * and the verdicts come back together. Measured on Jev in mu (2026-09-23): 16
+ * and the verdicts come back together. Measured on Jev (2026-09-23): 16
  * chunks in 0.44 s and 7.6k tokens, against 1.4 s and 11.6k tokens as 16
  * requests, with the same verdicts.
  */

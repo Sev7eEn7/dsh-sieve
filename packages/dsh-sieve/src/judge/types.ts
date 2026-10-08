@@ -3,8 +3,8 @@
  * answered with probabilities. The shapes match System One, so a request can
  * reach Jev without translation.
  *
- * Ported from mu `packages/kyrn-judge/src/types.ts` (MIT, see
- * THIRD_PARTY_NOTICES.md). Cascade-only fields are dropped; usage carries the
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
+ * Cascade-only fields are dropped; usage carries the
  * same disjoint counters as DSH `TokenUsage`.
  * @module
  */

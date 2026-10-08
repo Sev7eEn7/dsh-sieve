@@ -8,8 +8,8 @@
  * point, so the caller batches these with its rule-based forgetting and keeps
  * them sticky.
  *
- * Ported from mu `packages/kyrn-judge/src/decisions/context-forget.ts` (MIT,
- * see THIRD_PARTY_NOTICES.md); id and policy unchanged. Version 2 adds the
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
+ * Version 2 adds the
  * preview and counts age in tool results instead of user turns: without the
  * result's content the judge could not be sure (Jev answered 0.59–0.74 where
  * shrinking needs at most 0.2), and a single-request task never aged by turns.

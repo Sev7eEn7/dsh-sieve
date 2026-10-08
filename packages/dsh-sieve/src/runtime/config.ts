@@ -29,7 +29,7 @@ export interface JudgeConfig {
    * `auto` (default): Jev over System One with the key DSH's credential store
    * holds (see `runtime/jev.ts`), resolved per call; no key, no judgment.
    * `system-one`: Jev over HTTP (TypeSafe or OpenRouter), needs `apiKey`.
-   * `laya`: the local Laya sidecar mu starts (`mu judge start`), no key.
+   * `laya`: the local Laya sidecar, no key.
    */
   type: JudgeType
   /** system-one: judge model, default `jev-latest`. */

@@ -1,5 +1,5 @@
 /**
- * dsh-sieve: token-saving judgment plugins for DeepSeek Harness, ported from mu.
+ * dsh-sieve: token-saving judgment plugins for DeepSeek Harness.
  *
  * The `sieve` service binds the judgment kernel to profile configuration, a
  * dedicated judge model (Jev or Laya; never the session's own model) and the

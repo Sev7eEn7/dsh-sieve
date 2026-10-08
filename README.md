@@ -130,7 +130,7 @@ flowchart LR
 | Judge model | Description | Needs |
 |---|---|---|
 | **Jev** | TypeSafe's structured judgment model. It answers yes/no and single-choice questions natively over the System One protocol, with a probability for each answer. Reached through TypeSafe's own endpoint or OpenRouter, billed by TypeSafe ([official pricing](https://docs.typesafe.ai/models)) | A TypeSafe or OpenRouter API key |
-| **Laya** | An open-weight typed decision model (mmBERT-base, 322M) running on Core ML on this machine: requests never leave it and cost nothing. Its window is only 1024 tokens, so long states are cut, and it is clearly weaker than Jev on complex questions | macOS on Apple Silicon, with the local server from mu |
+| **Laya** | An open-weight typed decision model (mmBERT-base, 322M) running on Core ML on this machine: requests never leave it and cost nothing. Its window is only 1024 tokens, so long states are cut, and it is clearly weaker than Jev on complex questions | macOS on Apple Silicon, with the local Laya server running |
 
 **No session model.** Judgments go only to Jev or Laya. sieve never hands a judgment to the session's main model and has no setting for it; a profile from an older version with `judge.type: llm`, `judge.type: off`, `judge.provider` or `routes` fails to load.
 
@@ -155,21 +155,80 @@ Measured in offline replay: 326 Jev requests, all successful; HTTP latency P50 2
 
 ### Using Laya
 
-The local Laya server comes from [mu](https://github.com/qybaihe/mu) and supports only macOS on Apple Silicon. sieve only connects to it; it does not install or start it.
+Laya runs on this machine and supports only macOS 15+ on Apple Silicon (Core ML). sieve only connects to a Laya server over local HTTP, by default at `127.0.0.1:47823`; it ships no server and does not install or start one. Setting one up takes three parts:
 
-```bash
-npm i -g mu-agent
+1. **Inference library**: [`laya-coreml`](https://github.com/mizorewww/laya-coreml) (Apache-2.0), a Core ML port of [Laya](https://github.com/NandhaKishorM/laya) that needs no PyTorch. With [uv](https://docs.astral.sh/uv/):
+
+   ```bash
+   uv venv --python 3.12 ~/.laya/.venv
+   ```
+
+   ```bash
+   uv pip install --python ~/.laya/.venv/bin/python --index-url https://pypi.org/simple laya-coreml==0.1.0
+   ```
+
+2. **Weights**: the checkpoint `aac6fef/laya-multilingual-coreml` on Hugging Face (mmBERT-base, 322M, FP16, about 680 MB). Download it and check it against the bundle's own manifest:
+
+   ```bash
+   ~/.laya/.venv/bin/python - <<'PY'
+   import json
+   from pathlib import Path
+   from huggingface_hub import snapshot_download
+   from laya_coreml.artifacts import verify_files
+
+   target = Path.home() / ".laya/models/laya-multilingual-coreml"
+   snapshot_download("aac6fef/laya-multilingual-coreml", local_dir=target, allow_patterns=[
+       "coreml_config.json", "rl_agent_config.json", "encoder/config.json", "tokenizer/*",
+       "model.mlpackage/**", "host_weights.safetensors", "README.md", "LICENSE*", "NOTICE*"])
+   files = json.loads((target / "coreml_config.json").read_text())["files"]
+   verify_files(target, files)
+   print(f"verified {len(files)} files")
+   PY
+   ```
+
+   In Python, `laya_coreml.load(model_dir, local_files_only=True)` returns a model whose `predict(state, questions)` answers Laya's own question types (`noul`, `choice`, `score`).
+
+3. **HTTP server**: a small local service around that model that implements the protocol below. sieve does not provide one; write your own or use any implementation of the same protocol.
+
+<details>
+<summary>Laya server protocol</summary>
+
+`POST /evaluate`, `Content-Type: application/json`:
+
+```json
+{
+  "state": "string, object or array",
+  "questions": {
+    "q1": { "type": "boolean", "instructions": "…", "criteria": { "true": "…", "false": "…" } },
+    "q2": { "type": "choice", "instructions": "…", "criteria": { "keep": "…", "drop": null } },
+    "q3": { "type": "score", "instructions": "…", "criteria": ["low", "mid", "high"] }
+  }
+}
 ```
 
-```bash
-mu judge setup
+`boolean` corresponds to Laya's `noul`; `criteria` of a `boolean` question is optional, and `null` descriptions should be passed to Laya as empty or left out. A successful response is HTTP 200:
+
+```json
+{
+  "answers": {
+    "q1": { "type": "boolean", "probability": 0.93 },
+    "q2": { "type": "choice", "choice": "keep", "probabilities": { "keep": 0.81, "drop": 0.19 } },
+    "q3": { "type": "score", "score": 1.4, "probabilities": { "0": 0.1, "1": 0.4, "2": 0.5 } }
+  },
+  "usage": { "inputTokens": 980, "outputTokens": 0 },
+  "warnings": [{ "type": "state_truncated", "questionId": "q1", "message": "…" }],
+  "providerMetadata": { "laya": { "model": "laya:aac6fef/laya-multilingual-coreml", "answers": { "q1": { "confidence": 0.7 } } } }
+}
 ```
 
-```bash
-mu judge start
-```
+- Every question must get an answer of the same `type`, or sieve rejects the whole response. `probability` is P(true); `score` is a fractional position in `[0, levels - 1]`.
+- `usage`, `warnings` and `providerMetadata` are optional. `warnings` is where truncation should be reported (sieve records it in the ledger); `providerMetadata.laya.model` names the model in the ledger, and `confidence` must be in `[0, 1]` or it is ignored.
+- Errors: 4xx (bad request) or 5xx (server failure) with `{"error": {"message": "…"}}`; either way sieve keeps the original.
+- Bind to loopback only, since the protocol has no authentication. A Core ML model must not be called concurrently, so serialize requests.
 
-`setup` creates the Python environment and downloads and verifies the weights (about 680 MB); `start` keeps the server running in the background on `127.0.0.1:47823`. Then set in the profile:
+</details>
+
+With the server running, set in the profile:
 
 ```yaml
 - id: sieve
@@ -182,7 +241,7 @@ mu judge start
 While the Laya server is not running, every judgment fails and keeps the original, recorded as `error:unreachable` in the ledger; the rules still run.
 
 > [!NOTE]
-> Laya's window is 1024 tokens, shared by the question, its options and the state; anything beyond is cut from the end of the state and recorded as a warning in the ledger. mu's measurements show it usable on simple predicates and close to random on questions that need a synthesized judgment. sieve's four decisions have not been measured on Laya; use Jev when judgment quality matters.
+> Laya's window is 1024 tokens, shared by the question, its options and the state; anything beyond is cut from the end of the state and recorded as a warning in the ledger. Earlier measurements show it usable on simple predicates and close to random on questions that need a synthesized judgment. sieve's four decisions have not been measured on Laya; use Jev when judgment quality matters.
 
 ## Design constraints
 
@@ -440,6 +499,6 @@ packages/
 
 ## Acknowledgments and license
 
-Parts of the judgment kernel and the Laya provider come from [mu](https://github.com/qybaihe/mu); source paths and the commit are recorded in [THIRD_PARTY_NOTICES.md](packages/dsh-sieve/THIRD_PARTY_NOTICES.md).
+Parts of the code are derived from third-party MIT-licensed code; its copyright notice and license are in [THIRD_PARTY_NOTICES.md](packages/dsh-sieve/THIRD_PARTY_NOTICES.md).
 
 Released under the [MIT](LICENSE) license.

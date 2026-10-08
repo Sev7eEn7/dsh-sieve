@@ -1,17 +1,15 @@
 /**
- * Batched, log-backed forgetting, rewritten for DSH after mu
- * packages/kyrn-judge/src/extension/features/forgetting.ts (MIT).
- * Copyright (c) 2025 Mario Zechner
- * See THIRD_PARTY_NOTICES.md for the source commit and license.
+ * Batched, log-backed forgetting.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
  *
  * Only the most recent tool results stay whole. Older ones, and reads that a
  * later read of the same lines superseded, are archived and replaced by their
  * ends and a pointer; the judge may add results inside the recent window that
  * the work has moved past. Replacing a result breaks the cached prefix from
  * there on, so replacements wait until one batch saves `minBatchChars`, and a
- * batch lands before one request. mu forgot only past 50/70/85% of the context
- * window: on public SWE trajectories most tasks never got there, while a batch
- * of old results pays for its cache rebuild within a few requests.
+ * batch lands before one request. There are no 50/70/85% context-window
+ * thresholds: on public SWE trajectories most tasks never reach them, while a
+ * batch of old results pays for its cache rebuild within a few requests.
  */
 import { resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'

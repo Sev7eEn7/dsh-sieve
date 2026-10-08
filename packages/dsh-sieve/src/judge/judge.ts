@@ -7,9 +7,8 @@
  * provider honors them: an answer that arrives after either fired is not
  * accepted. Every failure carries what its requests are known to have cost.
  *
- * Adapted from mu `packages/kyrn-judge/src/judge.ts` (MIT, see
- * THIRD_PARTY_NOTICES.md) without the cascade: sieve has one judge per
- * decision, chosen by the host.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
+ * There is no cascade: sieve has one judge per decision, chosen by the host.
  * @module
  */
 

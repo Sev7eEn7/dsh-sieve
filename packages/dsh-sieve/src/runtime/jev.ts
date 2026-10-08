@@ -21,7 +21,7 @@ export const JEV_SERVICES: readonly JevService[] = ['typesafe', 'openrouter']
 
 /** The credential reference holding each service's key. */
 export const JEV_KEY_REFS: Readonly<Record<JevService, string>> = {
-  // TypeSafe's and mu's own name, so a key already exported for mu works as is.
+  // TypeSafe's own name, so a key already exported for it works as is.
   typesafe: 'TYPESAFE_API_KEY',
   // sieve's own name: a general OpenRouter key kept for model access must not start paid judge calls by itself.
   openrouter: 'SIEVE_JUDGE_OPENROUTER_API_KEY',

@@ -1,7 +1,7 @@
 /**
  * Why a judge call failed. Callers never branch on message text.
  *
- * Ported from mu `packages/kyrn-judge/src/errors.ts` (MIT, see THIRD_PARTY_NOTICES.md).
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
  *
  * - `auth`: no usable key, or no judge configured at all. The next call fails
  *   the same way until the user sets one up.

@@ -2,9 +2,8 @@
  * Ledger records: one per judged decision (or one per batch), kept so §7 of
  * the migration plan can price every judge call against what it saved.
  *
- * Field set adapted from mu `packages/kyrn-judge/src/ledger.ts` (MIT, see
- * THIRD_PARTY_NOTICES.md). Usage is complete: mu's batch records wrote output
- * tokens as 0, which made judge cost unmeasurable.
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
+ * Usage is complete, batch records included, so judge cost stays measurable.
  * @module
  */
 

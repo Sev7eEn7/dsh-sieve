@@ -2,9 +2,8 @@
  * Decision specs: what a judge is asked at one decision point, and how its
  * answers become an outcome the host acts on.
  *
- * The spec shape is ported from mu `packages/kyrn-judge/src/decision.ts` (MIT,
- * see THIRD_PARTY_NOTICES.md) so mu's question wordings, policies and versions
- * carry over unchanged. Fields nothing in sieve reads are dropped: the
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
+ * Fields nothing in sieve reads are dropped: the
  * cascade-only `capabilities`, the descriptive `cacheImpact` and `latency`, and
  * `allowChoicesWithoutEscape`, whose check never saw the questions built per
  * input. tests/judge/decisions.spec.ts checks that every choice question of the

@@ -9,7 +9,7 @@
  * only credentials have, a value assigned to a name that says it is one, and
  * the values of this process's own credential variables.
  *
- * Ported from mu `packages/kyrn-judge/src/redact.ts` (MIT, see THIRD_PARTY_NOTICES.md).
+ * Contains MIT-licensed third-party code, see THIRD_PARTY_NOTICES.md.
  * @module
  */
 
