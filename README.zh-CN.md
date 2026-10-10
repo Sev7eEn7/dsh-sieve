@@ -1,8 +1,8 @@
 <div align="center">
 
-<p><a href="README.md">English</a> | <strong>简体中文</strong></p>
-
 <img src="assets/banner.webp" alt="sieve" width="100%">
+
+<p><a href="README.md">English</a> | <strong>简体中文</strong></p>
 
 <h1>sieve / dsh-sieve</h1>
 
