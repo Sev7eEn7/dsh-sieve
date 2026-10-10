@@ -1,10 +1,10 @@
 <div align="center">
 
-**English** | [简体中文](README.zh-CN.md)
+<p><strong>English</strong> | <a href="README.zh-CN.md">简体中文</a></p>
 
 <img src="assets/banner.webp" alt="sieve" width="100%">
 
-# sieve / dsh-sieve
+<h1>sieve / dsh-sieve</h1>
 
 **LLM agent context engineering and token efficiency plugins for DeepSeek Harness (DSH)**
 

@@ -1,10 +1,10 @@
 <div align="center">
 
-[English](README.md) | **中文**
+<p><a href="README.md">English</a> | <strong>简体中文</strong></p>
 
 <img src="assets/banner.webp" alt="sieve" width="100%">
 
-# sieve / dsh-sieve
+<h1>sieve / dsh-sieve</h1>
 
 **面向 DeepSeek Harness（DSH）的 LLM Agent 上下文工程与 Token 效率优化插件**
 
