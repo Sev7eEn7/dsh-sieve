@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Builds dsh-sieve-web's browser half, lib/client.js, in the artifact shape DSH
-// Client Modules load (pinned DSH 5badb15, packages/client/tsdown.client.ts):
+// Client Modules load (pinned DSH 0.2.1-rc.2 687f282, packages/client/tsdown.client.ts):
 // one CommonJS factory handed to window.__ModuleLoader__.load, whose injected
 // require answers only the shell's platform modules. Everything else is
 // inlined; a value import of any other @deepseek-ai package, or of a Node
@@ -17,9 +17,10 @@ import { rolldown } from 'rolldown'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const pkgDir = join(root, 'packages', 'dsh-sieve-web')
 
-/** The module-table keys the DSH 0.2.1-alpha.1 shell seeds (packages/client/web/src/platform.ts). */
+/** The module-table keys the DSH 0.2.1-rc.2 shell seeds (packages/client/web/src/platform.ts). */
 export const PLATFORM_MODULES = [
   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis',
+  'zod', '@tanstack/react-virtual',
   '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-primitives',

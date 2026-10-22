@@ -8,7 +8,7 @@ import { isTestLog, planTestLog, renderTestLogBody, testLogSelection } from '../
 import { toolAdmissionBatch } from '../judge/decisions/tool-admission.ts'
 import type { AdmissionOutcome } from '../judge/decisions/tool-admission.ts'
 import type { Decision, DecisionEngine } from '../judge/engine.ts'
-import type { LedgerAnnotation } from '../judge/ledger.ts'
+import type { LedgerAnnotation, LedgerRecord } from '../judge/ledger.ts'
 import type { ResolvedConfig } from '../runtime/config.ts'
 import { deadline, untilAbort } from '../runtime/operations.ts'
 import { isSieveResult, SessionRuntime, textOf } from '../runtime/session-state.ts'
@@ -21,6 +21,8 @@ export interface AdmissionHost {
   readonly config: ResolvedConfig
   engineFor(agent: Agent): DecisionEngine
   annotate(sessionId: SessionId, ledgerId: string, patch: LedgerAnnotation): Promise<void>
+  /** A session's ledger records, oldest first. */
+  ledger(sessionId: SessionId): readonly LedgerRecord[]
   track<T>(work: Promise<T>): Promise<T>
   revisionOf(sessionId: SessionId): number
   /** Whether a judge model (Jev or Laya) is configured; without one no decision changes anything. */

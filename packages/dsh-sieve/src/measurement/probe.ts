@@ -12,7 +12,14 @@ import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 import { z as schema } from 'zod'
 
 export interface AttemptMetric { turn: number, step: number, ttftMs: number | null, durationMs: number, committed: boolean, eventSeq?: number, finish?: string }
-export interface ProbeState { attempts: AttemptMetric[], surfaceTokens: number[], steps: number, stepLimitReached?: boolean }
+export interface ProbeState {
+  attempts: AttemptMetric[]
+  surfaceTokens: number[]
+  steps: number
+  stepLimitReached?: boolean
+  /** Preflight only: whether sieve had a judge model in this process (null when the sieve service is not mounted). */
+  judgeReady?: boolean | null
+}
 /**
  * One provider Messages request seen on the wire. Holds request settings and
  * the model id the provider answered with; never headers or message content.
@@ -83,6 +90,11 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     signal.throwIfAborted()
     const state = stateOf(agent.session.header.id)
     if (state.steps >= config.maxSteps) { state.stepLimitReached = true; save(agent.session.header.id); throw new Error('sieve: experiment step budget exhausted') }
+    if (config.preflight && state.judgeReady === undefined) {
+      // Free: `auto` resolves the key in the credential store; no judge request is sent.
+      state.judgeReady = await ctx.get('sieve')?.judgeReady() ?? null
+      save(agent.session.header.id)
+    }
     entered.set(agent, performance.now())
     const decision = await next()
     if (decision.kind === 'enter') { state.steps++; save(agent.session.header.id) }

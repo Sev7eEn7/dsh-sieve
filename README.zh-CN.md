@@ -19,8 +19,8 @@ sieve 通过工具输出过滤、历史上下文裁剪与技能按需披露，�
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](tsconfig.base.json)
 [![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933?logo=nodedotjs&logoColor=white)](package.json)
-[![DeepSeek Harness](https://img.shields.io/badge/DSH-0.2.1--alpha.1-4D6BFE)](packages/dsh-sieve/package.json)
-[![Cordis](https://img.shields.io/badge/Cordis-4.0.5--alpha.1-6E56CF)](packages/dsh-sieve/package.json)
+[![DeepSeek Harness](https://img.shields.io/badge/DSH-0.2.1--rc.2-4D6BFE)](packages/dsh-sieve/package.json)
+[![Cordis](https://img.shields.io/badge/Cordis-4.0.5-6E56CF)](packages/dsh-sieve/package.json)
 <br>
 ![Tests](https://img.shields.io/badge/tests-265%20passed-brightgreen)
 ![Test keys](https://img.shields.io/badge/test%20suite-no%20API%20keys-brightgreen)
@@ -63,7 +63,7 @@ Agent 循环里，主模型每一步都要重新读一遍完整上下文。决�
 1. 安装插件（Web profile 同时装面板）：
 
    ```bash
-   dsh plugin --profile web add dsh-sieve@0.2.0 dsh-sieve-web@0.2.0
+   dsh plugin --profile web add dsh-sieve@0.3.0 dsh-sieve-web@0.3.0
    ```
 
 2. 配置判断模型，二选一：
@@ -317,7 +317,7 @@ sieve 减少工具输出、历史结果和技能目录中被反复发送的冗�
 
 唯一会改写历史的是 `context.forget`。它的设计目标就是把这次重建限制成偶发的一次性开销：
 
-1. **主要动老结果**：规则只遗忘最近 4 个工具结果（`keepRecent`）之前、至少 1,500 字符的结果，以及已被之后的读取完整覆盖的旧读取；更新的结果只有判断模型认定已经用不上时才会被替换；
+1. **主要动老结果**：规则只遗忘最近 4 步（`keepRecent`）之前、至少 1,500 字符的命令输出，以及已被之后的读取完整覆盖的旧读取；更早的文件读取和较新的结果只有判断模型认定已经用不上时才会被替换；文件被遗忘后又重读，就不再按年龄遗忘它，重读量也会从面板的缩减量中扣除；
 2. **攒够才提交**：一批至少能省 1 万字符才落地（`minBatchChars`），不够就等下一批，不会每一步都改一点；
 3. **一批只重建一次**：同一批的所有替换在同一个请求之前一次落地，之后的请求又在新前缀上连续命中，而且新前缀更短，此后每一步都少发这部分内容。
 
@@ -351,6 +351,7 @@ sieve 减少工具输出、历史结果和技能目录中被反复发送的冗�
 
 | sieve | DeepSeek Harness | Node.js |
 |---|---|---|
+| `0.3.0` | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
 | `0.2.0` | `0.2.1-alpha.1` | `^22.19.0 \|\| >=24.0.0` |
 
 ### 方式一：npm（推荐）
@@ -358,29 +359,29 @@ sieve 减少工具输出、历史结果和技能目录中被反复发送的冗�
 预构建包，不需要在本机编译，也不需要授权构建脚本。插件本体与 Web 面板一起装：
 
 ```bash
-dsh plugin --profile web add dsh-sieve@0.2.0 dsh-sieve-web@0.2.0
+dsh plugin --profile web add dsh-sieve@0.3.0 dsh-sieve-web@0.3.0
 ```
 
 `headless` 等没有 Web 界面的 profile 只装本体：
 
 ```bash
-dsh plugin --profile headless add dsh-sieve@0.2.0
+dsh plugin --profile headless add dsh-sieve@0.3.0
 ```
 
-也可以在 DSH Web 侧边栏打开**插件 → 添加插件**，依次输入 `dsh-sieve@0.2.0`、`dsh-sieve-web@0.2.0` 安装，效果与命令行相同。
+也可以在 DSH Web 侧边栏打开**插件 → 添加插件**，依次输入 `dsh-sieve@0.3.0`、`dsh-sieve-web@0.3.0` 安装，效果与命令行相同。
 
 ### 方式二：GitHub Release
 
-npm 不可达或想锁定到构建产物时，直接装 [Release](https://github.com/Sev7eEn7/sieve/releases) 附带的 tgz，同样是预构建包。发布页附有 `SHA256SUMS` 供校验：
+npm 不可达或想锁定到构建产物时，直接装 [Release](https://github.com/Sev7eEn7/dsh-sieve/releases) 附带的 tgz，同样是预构建包。发布页附有 `SHA256SUMS` 供校验：
 
 ```bash
-dsh plugin --profile web add https://github.com/Sev7eEn7/sieve/releases/download/v0.2.0/dsh-sieve-0.2.0.tgz https://github.com/Sev7eEn7/sieve/releases/download/v0.2.0/dsh-sieve-web-0.2.0.tgz
+dsh plugin --profile web add https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.3.0/dsh-sieve-0.3.0.tgz https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.3.0/dsh-sieve-web-0.3.0.tgz
 ```
 
 ### 方式三：从源码构建
 
 ```bash
-git clone https://github.com/Sev7eEn7/sieve.git && cd sieve
+git clone https://github.com/Sev7eEn7/dsh-sieve.git && cd dsh-sieve
 ```
 
 ```bash
@@ -388,13 +389,13 @@ pnpm install && pnpm release:pack
 ```
 
 ```bash
-dsh plugin --profile web add ./release/dsh-sieve-0.2.0.tgz ./release/dsh-sieve-web-0.2.0.tgz
+dsh plugin --profile web add ./release/dsh-sieve-0.3.0.tgz ./release/dsh-sieve-web-0.3.0.tgz
 ```
 
 `pnpm release:pack` 会构建两个包，检查版本与 peer 一致、产物里没有 `workspace:` 和本机路径，然后把 tgz 和 `SHA256SUMS` 输出到 `release/`。
 
 > [!NOTE]
-> 不支持 `github:Sev7eEn7/sieve` 这种 git 安装：仓库是 monorepo，git 安装只拿到源码，不带 `lib/` 构建产物。请用上面三种方式之一。
+> 不支持 `github:Sev7eEn7/dsh-sieve` 这种 git 安装：仓库是 monorepo，git 安装只拿到源码，不带 `lib/` 构建产物。请用上面三种方式之一。
 
 ### 启用与验证
 

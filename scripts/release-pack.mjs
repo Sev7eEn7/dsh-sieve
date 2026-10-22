@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const out = join(root, 'release')
-const repo = 'Sev7eEn7/sieve'
+const repo = 'Sev7eEn7/dsh-sieve'
 const packages = ['dsh-sieve', 'dsh-sieve-web'].map(dir => {
   const path = join(root, 'packages', dir)
   return { path, manifest: JSON.parse(readFileSync(join(path, 'package.json'), 'utf8')) }

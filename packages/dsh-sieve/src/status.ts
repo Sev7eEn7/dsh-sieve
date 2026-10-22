@@ -26,7 +26,11 @@ export const DSH_TEXT_CHARS_PER_TOKEN = 4
  * same content is not subtracted.
  */
 export interface SieveReduction {
-  /** Characters removed: the ledger's `savedChars` summed over applied records. */
+  /**
+   * Characters removed: the ledger's `savedChars` summed over applied records.
+   * A re-read of a forgotten file is an applied record with a negative saving,
+   * so this is net of what came back.
+   */
   readonly chars: number
   /** `chars` priced at DSH's token meter text density ({@link DSH_TEXT_CHARS_PER_TOKEN}). */
   readonly tokens: number

@@ -19,8 +19,8 @@ Built around context engineering and token efficiency, sieve manages the context
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](tsconfig.base.json)
 [![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933?logo=nodedotjs&logoColor=white)](package.json)
-[![DeepSeek Harness](https://img.shields.io/badge/DSH-0.2.1--alpha.1-4D6BFE)](packages/dsh-sieve/package.json)
-[![Cordis](https://img.shields.io/badge/Cordis-4.0.5--alpha.1-6E56CF)](packages/dsh-sieve/package.json)
+[![DeepSeek Harness](https://img.shields.io/badge/DSH-0.2.1--rc.2-4D6BFE)](packages/dsh-sieve/package.json)
+[![Cordis](https://img.shields.io/badge/Cordis-4.0.5-6E56CF)](packages/dsh-sieve/package.json)
 <br>
 ![Tests](https://img.shields.io/badge/tests-265%20passed-brightgreen)
 ![Test keys](https://img.shields.io/badge/test%20suite-no%20API%20keys-brightgreen)
@@ -63,7 +63,7 @@ For AI coding agents running on DeepSeek Harness, especially tasks with verbose 
 1. Install the plugin (the web profile also gets the panel):
 
    ```bash
-   dsh plugin --profile web add dsh-sieve@0.2.0 dsh-sieve-web@0.2.0
+   dsh plugin --profile web add dsh-sieve@0.3.0 dsh-sieve-web@0.3.0
    ```
 
 2. Configure a judge model, one of:
@@ -317,7 +317,7 @@ Not persistently. Prompt caches match by prefix: the part of a request that is i
 
 `context.forget` is the only part that rewrites history, and it is designed to keep that rebuild an occasional one-time cost:
 
-1. **Mostly old results**: rules forget only results before the 4 most recent (`keepRecent`) of at least 1,500 characters, plus earlier reads that a later read fully covers; newer results are replaced only when the judge model finds them no longer needed;
+1. **Mostly old results**: rules forget only command output from before the 4 most recent steps (`keepRecent`) of at least 1,500 characters, plus earlier reads that a later read fully covers; older file reads and newer results are replaced only when the judge model finds them no longer needed, and a file read again after being forgotten is not forgotten by age again (the re-read is subtracted from the reported reduction);
 2. **Commit only when it pays**: a batch lands only if it saves at least 10,000 characters (`minBatchChars`); otherwise it waits for the next one, instead of changing a little at every step;
 3. **One rebuild per batch**: all replacements in a batch land before the same request, and later requests hit the cache again on the new, shorter prefix, sending less at every following step.
 
@@ -351,6 +351,7 @@ No. A judge request carries only the content being judged and the task goal (red
 
 | sieve | DeepSeek Harness | Node.js |
 |---|---|---|
+| `0.3.0` | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
 | `0.2.0` | `0.2.1-alpha.1` | `^22.19.0 \|\| >=24.0.0` |
 
 ### Option 1: npm (recommended)
@@ -358,29 +359,29 @@ No. A judge request carries only the content being judged and the task goal (red
 Prebuilt packages: nothing compiles on your machine and no build scripts need approval. Install the plugin and the Web panel together:
 
 ```bash
-dsh plugin --profile web add dsh-sieve@0.2.0 dsh-sieve-web@0.2.0
+dsh plugin --profile web add dsh-sieve@0.3.0 dsh-sieve-web@0.3.0
 ```
 
 Profiles without a Web UI, such as `headless`, install only the plugin:
 
 ```bash
-dsh plugin --profile headless add dsh-sieve@0.2.0
+dsh plugin --profile headless add dsh-sieve@0.3.0
 ```
 
-You can also open **Plugins → Add plugin** in the DSH Web sidebar and enter `dsh-sieve@0.2.0`, then `dsh-sieve-web@0.2.0`; the result is the same.
+You can also open **Plugins → Add plugin** in the DSH Web sidebar and enter `dsh-sieve@0.3.0`, then `dsh-sieve-web@0.3.0`; the result is the same.
 
 ### Option 2: GitHub Release
 
-If npm is unreachable or you want to pin the exact build, install the tarballs attached to the [Release](https://github.com/Sev7eEn7/sieve/releases). They are the same prebuilt packages. The release includes `SHA256SUMS` for verification:
+If npm is unreachable or you want to pin the exact build, install the tarballs attached to the [Release](https://github.com/Sev7eEn7/dsh-sieve/releases). They are the same prebuilt packages. The release includes `SHA256SUMS` for verification:
 
 ```bash
-dsh plugin --profile web add https://github.com/Sev7eEn7/sieve/releases/download/v0.2.0/dsh-sieve-0.2.0.tgz https://github.com/Sev7eEn7/sieve/releases/download/v0.2.0/dsh-sieve-web-0.2.0.tgz
+dsh plugin --profile web add https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.3.0/dsh-sieve-0.3.0.tgz https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.3.0/dsh-sieve-web-0.3.0.tgz
 ```
 
 ### Option 3: Build from source
 
 ```bash
-git clone https://github.com/Sev7eEn7/sieve.git && cd sieve
+git clone https://github.com/Sev7eEn7/dsh-sieve.git && cd dsh-sieve
 ```
 
 ```bash
@@ -388,13 +389,13 @@ pnpm install && pnpm release:pack
 ```
 
 ```bash
-dsh plugin --profile web add ./release/dsh-sieve-0.2.0.tgz ./release/dsh-sieve-web-0.2.0.tgz
+dsh plugin --profile web add ./release/dsh-sieve-0.3.0.tgz ./release/dsh-sieve-web-0.3.0.tgz
 ```
 
 `pnpm release:pack` builds both packages, checks that versions and peers agree and that the output contains no `workspace:` or local paths, then writes the tarballs and `SHA256SUMS` to `release/`.
 
 > [!NOTE]
-> Installing from git (`github:Sev7eEn7/sieve`) is not supported: the repository is a monorepo, and a git install gets only the sources, without the built `lib/`. Use one of the three options above.
+> Installing from git (`github:Sev7eEn7/dsh-sieve`) is not supported: the repository is a monorepo, and a git install gets only the sources, without the built `lib/`. Use one of the three options above.
 
 ### Enable and verify
 
