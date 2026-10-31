@@ -113,10 +113,10 @@ sieve 的 Harness 模块共用同一个判断内核：不只给 Token 止血，�
 | **技能按需披露（Progressive Skill Disclosure）** | 按任务相关性展示技能目录，减少无关技能描述占用上下文窗口 |
 | **提示缓存感知的上下文管理（Prompt Cache Awareness）** | 新工具结果在写入前处理；历史裁剪按批提交，控制缓存前缀重建频率 |
 
-## 本次更新：Harness 模块
+## 0.4.0 更新：Harness 模块
 
 > [!NOTE]
-> **未发布。** 在 `main` 分支上，尚未发布到 npm 和 GitHub Release：0.3.0 只有省 token 的决策。想试用请[从源码构建](#方式三从源码构建)；下一次发布之前，包的版本号仍是 0.3.0。
+> **已在 0.4.0 发布。** 从只有省 token 决策的 0.3.0 升级：运行 `dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0`，然后重启 `dsh web`，见[升级与卸载](#升级与卸载)。
 
 省 Token 只是前半场。面对长周期、深水区的复杂任务，sieve 引入六大 Harness 模块，全由同一个判断内核驱动，专治各种“假动作”与迷航：
 
@@ -149,7 +149,7 @@ Hive、检查点和崩溃恢复默认生效。长任务监控和团队监工默�
 1. 安装插件（Web profile 同时装面板）：
 
    ```bash
-   dsh plugin --profile web add dsh-sieve@0.3.0 dsh-sieve-web@0.3.0
+   dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0
    ```
 
 2. 配置判断模型，二选一：
@@ -157,7 +157,7 @@ Hive、检查点和崩溃恢复默认生效。长任务监控和团队监工默�
    - **Laya**：在本机启动 Laya 服务，并在 profile 中把 `judge.type` 设为 `laya`，见[使用 Laya](#使用-laya)。
 3. 重启 `dsh web` 并刷新页面，在会话中输入 `/sieve status`，确认“判断模型”一行不是“未配置”。
 
-就这些：照常干活，看 **Sieve** 页的数字往上涨。用 `main` 构建的，还可以试试 `/hive <一个关于你代码的问题>`，同时开着 **Hive** 页。其他安装方式见[安装](#安装)。
+就这些：照常干活，看 **Sieve** 页的数字往上涨。然后试试 `/hive <一个关于你代码的问题>`，同时开着 **Hive** 页。其他安装方式见[安装](#安装)。
 
 ## 架构
 
@@ -494,34 +494,34 @@ sieve 减少工具输出、历史结果和技能目录中被反复发送的冗�
 
 | sieve | DeepSeek Harness | Node.js |
 |---|---|---|
-| 未发布（`main`） | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
+| `0.4.0` | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
 | `0.3.0` | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
 | `0.2.0` | `0.2.1-alpha.1` | `^22.19.0 \|\| >=24.0.0` |
 
-`main` 上的 Harness 模块新增了 peer：`dsh-subagent`、`dsh-goal`、`dsh-permission-presets`、`dsh-sandbox-policy`、`dsh-user-approval`，以及可选的 `dsh-experimental-agent-team`；没有它时团队监工不加载。
+从 0.4.0 起，Harness 模块新增了 peer：`dsh-subagent`、`dsh-goal`、`dsh-permission-presets`、`dsh-sandbox-policy`、`dsh-user-approval`，以及可选的 `dsh-experimental-agent-team`；没有它时团队监工不加载。
 
 ### 方式一：npm（推荐）
 
 预构建包，不需要在本机编译，也不需要授权构建脚本。插件本体与 Web 面板一起装：
 
 ```bash
-dsh plugin --profile web add dsh-sieve@0.3.0 dsh-sieve-web@0.3.0
+dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0
 ```
 
 `headless` 等没有 Web 界面的 profile 只装本体：
 
 ```bash
-dsh plugin --profile headless add dsh-sieve@0.3.0
+dsh plugin --profile headless add dsh-sieve@0.4.0
 ```
 
-也可以在 DSH Web 侧边栏打开**插件 → 添加插件**，依次输入 `dsh-sieve@0.3.0`、`dsh-sieve-web@0.3.0` 安装，效果与命令行相同。
+也可以在 DSH Web 侧边栏打开**插件 → 添加插件**，依次输入 `dsh-sieve@0.4.0`、`dsh-sieve-web@0.4.0` 安装，效果与命令行相同。
 
 ### 方式二：GitHub Release
 
 npm 不可达或想锁定到构建产物时，直接装 [Release](https://github.com/Sev7eEn7/dsh-sieve/releases) 附带的 tgz，同样是预构建包。发布页附有 `SHA256SUMS` 供校验：
 
 ```bash
-dsh plugin --profile web add https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.3.0/dsh-sieve-0.3.0.tgz https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.3.0/dsh-sieve-web-0.3.0.tgz
+dsh plugin --profile web add https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.0/dsh-sieve-0.4.0.tgz https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.0/dsh-sieve-web-0.4.0.tgz
 ```
 
 ### 方式三：从源码构建
@@ -535,10 +535,10 @@ pnpm install && pnpm release:pack
 ```
 
 ```bash
-dsh plugin --profile web add ./release/dsh-sieve-0.3.0.tgz ./release/dsh-sieve-web-0.3.0.tgz
+dsh plugin --profile web add ./release/dsh-sieve-0.4.0.tgz ./release/dsh-sieve-web-0.4.0.tgz
 ```
 
-`pnpm release:pack` 会构建两个包，检查版本与 peer 一致、产物里没有 `workspace:` 和本机路径，然后把 tgz 和 `SHA256SUMS` 输出到 `release/`。从 `main` 构建的包含未发布的 Harness 模块，但文件名仍是 0.3.0。
+`pnpm release:pack` 会构建两个包，检查版本与 peer 一致、产物里没有 `workspace:` 和本机路径，然后把 tgz 和 `SHA256SUMS` 输出到 `release/`。
 
 > [!NOTE]
 > 不支持 `github:Sev7eEn7/dsh-sieve` 这种 git 安装：仓库是 monorepo，git 安装只拿到源码，不带 `lib/` 构建产物。请用上面三种方式之一。
@@ -554,7 +554,7 @@ dsh plugin --profile web add ./release/dsh-sieve-0.3.0.tgz ./release/dsh-sieve-w
    ```
 
    输出里应有 `# == dsh-sieve` 和 `# == dsh-sieve-web` 两层。
-4. 在会话中输入 `/sieve status`：“判断模型”一行应显示 Jev 或 Laya；显示“未配置”时省 token 的决策不会改动任何内容。Web 右侧栏会出现 **Sieve** 页；从 `main` 构建的还会出现 **Hive** 页。
+4. 在会话中输入 `/sieve status`：“判断模型”一行应显示 Jev 或 Laya；显示“未配置”时省 token 的决策不会改动任何内容。Web 右侧栏会出现 **Sieve** 页，旁边还有 **Hive** 页。
 
 ### 升级与卸载
 

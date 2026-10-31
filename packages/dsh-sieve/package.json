@@ -1,6 +1,6 @@
 {
   "name": "dsh-sieve",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Context engineering and token optimization plugin for DeepSeek Harness (DSH): tool output filtering, context pruning and progressive skill disclosure for LLM coding agents",
   "license": "MIT",
   "keywords": [

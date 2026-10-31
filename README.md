@@ -113,10 +113,10 @@ For AI coding agents on DeepSeek Harness, especially with verbose test logs, fre
 | **Progressive skill disclosure** | Shows skills by task relevance, reducing context window usage from unrelated descriptions |
 | **Prompt cache awareness** | Processes new results before they are recorded and batches historical pruning to control prefix rebuild frequency |
 
-## What's new: harness modules
+## What's new in 0.4.0: harness modules
 
 > [!NOTE]
-> **Unreleased.** On `main`, not yet on npm or GitHub Releases: 0.3.0 has only the token-saving decisions. [Build from source](#option-3-build-from-source) to try it; the packages are still numbered 0.3.0 until the next release.
+> **Released in 0.4.0.** Coming from 0.3.0, which has only the token-saving decisions? Run `dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0` and restart `dsh web`; see [Upgrade and uninstall](#upgrade-and-uninstall).
 
 Saving tokens was only the opening act. For deep, long-horizon tasks, sieve introduces six harness modules driven by the exact same judge engine to prevent drift, loops, and false completions:
 
@@ -149,7 +149,7 @@ Also new: `/sieve checkpoints`, `/sieve rewind`, `/sieve rewind undo` and `/hive
 1. Install the plugin (the web profile also gets the panel):
 
    ```bash
-   dsh plugin --profile web add dsh-sieve@0.3.0 dsh-sieve-web@0.3.0
+   dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0
    ```
 
 2. Configure a judge model, one of:
@@ -157,7 +157,7 @@ Also new: `/sieve checkpoints`, `/sieve rewind`, `/sieve rewind undo` and `/hive
    - **Laya**: start the Laya server on this machine and set `judge.type` to `laya` in the profile, see [Using Laya](#using-laya).
 3. Restart `dsh web` and reload the page, then enter `/sieve status` in a session and check that the "判断模型" (judge model) line does not say "未配置" (not configured).
 
-That's it: work as usual and watch the **Sieve** page count up. With a build of `main`, also try `/hive <a question about your code>` and keep the **Hive** page open. For other ways to install see [Installation](#installation).
+That's it: work as usual and watch the **Sieve** page count up. Then try `/hive <a question about your code>` and keep the **Hive** page open. For other ways to install see [Installation](#installation).
 
 ## Architecture
 
@@ -494,34 +494,34 @@ No. A judge request carries only the content being judged and the task goal (red
 
 | sieve | DeepSeek Harness | Node.js |
 |---|---|---|
-| unreleased (`main`) | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
+| `0.4.0` | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
 | `0.3.0` | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
 | `0.2.0` | `0.2.1-alpha.1` | `^22.19.0 \|\| >=24.0.0` |
 
-On `main`, the harness modules add `dsh-subagent`, `dsh-goal`, `dsh-permission-presets`, `dsh-sandbox-policy` and `dsh-user-approval` to the peers, plus `dsh-experimental-agent-team` as optional: without it, the team supervisor does not load.
+From 0.4.0, the harness modules add `dsh-subagent`, `dsh-goal`, `dsh-permission-presets`, `dsh-sandbox-policy` and `dsh-user-approval` to the peers, plus `dsh-experimental-agent-team` as optional: without it, the team supervisor does not load.
 
 ### Option 1: npm (recommended)
 
 Prebuilt packages: nothing compiles on your machine and no build scripts need approval. Install the plugin and the Web panel together:
 
 ```bash
-dsh plugin --profile web add dsh-sieve@0.3.0 dsh-sieve-web@0.3.0
+dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0
 ```
 
 Profiles without a Web UI, such as `headless`, install only the plugin:
 
 ```bash
-dsh plugin --profile headless add dsh-sieve@0.3.0
+dsh plugin --profile headless add dsh-sieve@0.4.0
 ```
 
-You can also open **Plugins → Add plugin** in the DSH Web sidebar and enter `dsh-sieve@0.3.0`, then `dsh-sieve-web@0.3.0`; the result is the same.
+You can also open **Plugins → Add plugin** in the DSH Web sidebar and enter `dsh-sieve@0.4.0`, then `dsh-sieve-web@0.4.0`; the result is the same.
 
 ### Option 2: GitHub Release
 
 If npm is unreachable or you want to pin the exact build, install the tarballs attached to the [Release](https://github.com/Sev7eEn7/dsh-sieve/releases). They are the same prebuilt packages. The release includes `SHA256SUMS` for verification:
 
 ```bash
-dsh plugin --profile web add https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.3.0/dsh-sieve-0.3.0.tgz https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.3.0/dsh-sieve-web-0.3.0.tgz
+dsh plugin --profile web add https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.0/dsh-sieve-0.4.0.tgz https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.0/dsh-sieve-web-0.4.0.tgz
 ```
 
 ### Option 3: Build from source
@@ -535,10 +535,10 @@ pnpm install && pnpm release:pack
 ```
 
 ```bash
-dsh plugin --profile web add ./release/dsh-sieve-0.3.0.tgz ./release/dsh-sieve-web-0.3.0.tgz
+dsh plugin --profile web add ./release/dsh-sieve-0.4.0.tgz ./release/dsh-sieve-web-0.4.0.tgz
 ```
 
-`pnpm release:pack` builds both packages, checks that versions and peers agree and that the output contains no `workspace:` or local paths, then writes the tarballs and `SHA256SUMS` to `release/`. Built from `main`, they contain the unreleased harness modules but are still named 0.3.0.
+`pnpm release:pack` builds both packages, checks that versions and peers agree and that the output contains no `workspace:` or local paths, then writes the tarballs and `SHA256SUMS` to `release/`.
 
 > [!NOTE]
 > Installing from git (`github:Sev7eEn7/dsh-sieve`) is not supported: the repository is a monorepo, and a git install gets only the sources, without the built `lib/`. Use one of the three options above.
@@ -554,7 +554,7 @@ dsh plugin --profile web add ./release/dsh-sieve-0.3.0.tgz ./release/dsh-sieve-w
    ```
 
    The output should contain the `# == dsh-sieve` and `# == dsh-sieve-web` layers.
-4. Enter `/sieve status` in a session: the "判断模型" (judge model) line should name Jev or Laya; if it says "未配置" (not configured), the token-saving decisions change nothing. A **Sieve** page appears in the Web right sidebar, and a **Hive** page with a build from `main`.
+4. Enter `/sieve status` in a session: the "判断模型" (judge model) line should name Jev or Laya; if it says "未配置" (not configured), the token-saving decisions change nothing. A **Sieve** page appears in the Web right sidebar, with a **Hive** page beside it.
 
 ### Upgrade and uninstall
 
