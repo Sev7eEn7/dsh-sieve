@@ -1,5 +1,5 @@
 /**
- * The wire between the panel and the host: two endpoints on Connection's
+ * The wire between the panel and the host: three endpoints on Connection's
  * shared `/api` channel, in Connection's RPC envelope, so the browser calls
  * them with `ctx.connection.rpc.call` over whatever carrier the page uses.
  * Payloads are plain JSON; the host validates every field because they
@@ -8,7 +8,7 @@
  * @module
  */
 
-import type { JevService, SieveJudgeStatus, SieveReduction } from 'dsh-sieve/status'
+import type { JevService, SieveHiveView, SieveJudgeStatus, SieveReduction } from 'dsh-sieve/status'
 
 /** Connection's shared channel; it authenticates every request before an exact route sees it. */
 export const API_CHANNEL = '/api'
@@ -18,7 +18,10 @@ export const PANEL_ENDPOINT = 'sieve/panel'
 /** Store or remove one service's Jev key, then read the panel view. */
 export const KEY_ENDPOINT = 'sieve/key'
 
-export const ENDPOINTS: readonly string[] = [PANEL_ENDPOINT, KEY_ENDPOINT]
+/** Read the session's hives: bees, the delivery map, deliveries and gate verdicts. */
+export const HIVE_ENDPOINT = 'sieve/hive'
+
+export const ENDPOINTS: readonly string[] = [PANEL_ENDPOINT, KEY_ENDPOINT, HIVE_ENDPOINT]
 
 export interface PanelRequest {
   readonly sessionId: string
@@ -41,6 +44,9 @@ export interface PanelView {
 
 /** The view version this panel reads; a host on another version is reported, not guessed at. */
 export const PANEL_VERSION: PanelView['v'] = 3
+
+/** The hive view version the Hive page reads. */
+export const HIVE_VERSION: SieveHiveView['v'] = 1
 
 /** Shortest and longest key accepted; both services issue keys well inside this range. */
 export const API_KEY_LENGTH = { min: 8, max: 512 } as const

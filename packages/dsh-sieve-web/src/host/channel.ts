@@ -2,11 +2,11 @@
 import type { ConnectionRpcFailure, ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection'
 import type { Sieve } from 'dsh-sieve'
 import type { JevService } from 'dsh-sieve/status'
-import { API_KEY_LENGTH, KEY_ENDPOINT, PANEL_ENDPOINT, PANEL_VERSION } from '../protocol.ts'
+import { API_KEY_LENGTH, HIVE_ENDPOINT, KEY_ENDPOINT, PANEL_ENDPOINT, PANEL_VERSION } from '../protocol.ts'
 import type { KeyRequest, PanelRequest, PanelView, SieveRpcErrorCode } from '../protocol.ts'
 
 /** What the endpoints use of the sieve service. */
-export type SieveFacade = Pick<Sieve, 'status' | 'judgeStatus' | 'setJevKey'>
+export type SieveFacade = Pick<Sieve, 'status' | 'judgeStatus' | 'setJevKey' | 'hiveView'>
 
 type SessionKey = Parameters<Sieve['status']>[0]
 
@@ -83,6 +83,11 @@ export function sieveEndpoints(sieve: SieveFacade): SieveEndpoints {
       const request = parsePanel(record(payload))
       if (isFailure(request)) return request
       return { ok: true, value: await view(sieve, request.sessionId) }
+    }
+    if (endpoint === HIVE_ENDPOINT) {
+      const request = parsePanel(record(payload))
+      if (isFailure(request)) return request
+      return { ok: true, value: sieve.hiveView(request.sessionId as SessionKey) }
     }
     if (endpoint === KEY_ENDPOINT) {
       const services = (await sieve.judgeStatus()).keys.map(key => key.service)

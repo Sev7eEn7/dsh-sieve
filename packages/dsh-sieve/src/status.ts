@@ -157,4 +157,113 @@ export interface SieveStatus {
   }
   /** Newest first, at most the requested count. */
   readonly recent: readonly SieveRecordSummary[]
+  /** Checkpoints and rewinds; absent when the profile disables them. */
+  readonly checkpoint?: SieveCheckpointStatus
+}
+
+/** One session's checkpoints (harness plan §4 phase 4). */
+export interface SieveCheckpointStatus {
+  /** Whether the session's next change would be snapshotted. */
+  readonly enabled: boolean
+  /** Why not, in one line for a person; null when enabled. */
+  readonly off: string | null
+  readonly checkpoints: number
+  readonly latest: { readonly id: number, readonly turn: number, readonly label: string, readonly at: string } | null
+  readonly rewinds: number
+  /** The rewind `turn.rewind` proposed in this process, if any. */
+  readonly proposed: { readonly id: number, readonly trigger: string, readonly at: string } | null
+}
+
+/** Bumped when a field of the hive view changes meaning; readers reject other versions. */
+export type SieveHiveViewVersion = 1
+
+export type SieveBeeStatus = 'waiting' | 'running' | 'wrapping-up' | 'done' | 'failed' | 'timed-out' | 'stalled' | 'stopped' | 'not-started'
+
+export type SieveNoteKind = 'finding' | 'dead_end' | 'decision' | 'blocker'
+
+export interface SieveHiveBee {
+  readonly name: string
+  readonly focus: string
+  /** The route it ran on, e.g. "deepseek/deepseek-v4-flash, thinking low", or "parent model". */
+  readonly placement: string
+  readonly status: SieveBeeStatus
+  /** Started by the hive to settle a dispute. */
+  readonly verifier: boolean
+  /** Its latest words while it runs; its report once it ended. */
+  readonly said: string
+  readonly startedAt: string | null
+  readonly endedAt: string | null
+  /** Notes of its that passed the judge. */
+  readonly published: number
+  /** Notes handed to it. */
+  readonly received: number
+}
+
+/**
+ * A line between two bees on the map. A delivery is a note the judge handed
+ * from one bee to another; a correction is a later note that replaced an
+ * earlier one of another bee (drawn from the later to the earlier); a dispute
+ * is two notes that contradict each other and that nobody settled.
+ */
+export interface SieveHiveLink {
+  readonly kind: 'delivery' | 'correction' | 'conflict'
+  readonly from: string
+  readonly to: string
+  /** How many notes went this way. */
+  readonly count: number
+  /** The latest words that went along it, oldest first, at most three. */
+  readonly texts: readonly string[]
+}
+
+/** One note handed from one bee to another, in the order they were handed. */
+export interface SieveHiveDelivery {
+  readonly from: string
+  readonly to: string
+  readonly kind: SieveNoteKind
+  readonly score: number
+  readonly text: string
+}
+
+/** One gate verdict, passed or not: why somebody heard, or did not hear, about something. */
+export interface SieveHiveVerdict {
+  readonly at: string
+  /** publish, relate, deliver, withheld, correct, dispute or verify. */
+  readonly gate: string
+  /** The bee whose gate it was. */
+  readonly bee: string
+  /** Whether it let the note through; null for gates that only record. */
+  readonly passed: boolean | null
+  readonly score: number | null
+  readonly text: string
+}
+
+export interface SieveHiveRun {
+  readonly id: string
+  readonly goal: string
+  readonly status: 'running' | 'done' | 'cancelled'
+  readonly startedAt: string
+  readonly endedAt: string | null
+  readonly bees: readonly SieveHiveBee[]
+  readonly links: readonly SieveHiveLink[]
+  /** Newest last, at most the latest 40. */
+  readonly deliveries: readonly SieveHiveDelivery[]
+  /** Newest last, at most the latest 60. */
+  readonly verdicts: readonly SieveHiveVerdict[]
+  readonly counts: {
+    readonly notes: number
+    readonly deliveries: number
+    readonly judged: number
+    readonly corrections: number
+    readonly conflicts: number
+  }
+  /** Why some bees never ran, e.g. the subagent capacity was used up. */
+  readonly notes: readonly string[]
+}
+
+/** A session's hives as the Web panel reads them, oldest first. */
+export interface SieveHiveView {
+  readonly v: SieveHiveViewVersion
+  /** Whether the profile enables the hive. */
+  readonly enabled: boolean
+  readonly runs: readonly SieveHiveRun[]
 }

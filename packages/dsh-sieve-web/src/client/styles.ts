@@ -43,6 +43,36 @@ export const CSS = `
 .sieve-key-form { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; }
 .sieve-key-form > :first-child { flex: 1 1 160px; min-width: 0; }
 .sieve-footnote { margin: 0; color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 16px; }
+.sieve-hive-runs { display: flex; flex-wrap: wrap; gap: 4px; }
+.sieve-hive-goal { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.sieve-hive-status { font-weight: 600; }
+.sieve-hive-status[data-status="running"], .sieve-hive-status[data-status="wrapping-up"] { color: var(--dsw-alias-label-primary); }
+.sieve-hive-status[data-status="failed"], .sieve-hive-status[data-status="timed-out"], .sieve-hive-status[data-status="stalled"], .sieve-hive-status[data-status="not-started"] { color: var(--dsw-alias-state-error-primary); }
+.sieve-hive-tag { padding: 0 6px; border-radius: 6px; background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-secondary); font-size: 11px; }
+.sieve-hive-bees { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sieve-hive-bee { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 10px; border: 0.5px solid var(--dsw-alias-border-l2); }
+.sieve-hive-text { margin: 0; color: var(--dsw-alias-label-secondary); overflow-wrap: anywhere; }
+.sieve-hive-stage { position: relative; width: 100%; overflow: hidden; }
+.sieve-hive-stage > svg { position: absolute; left: 0; top: 0; }
+.sieve-hive-line { fill: none; stroke: var(--dsw-alias-label-tertiary); }
+.sieve-hive-line[data-kind="correction"] { stroke: var(--dsw-alias-label-primary); }
+.sieve-hive-line[data-kind="conflict"] { stroke: var(--dsw-alias-state-error-primary); stroke-dasharray: 4 3; }
+.sieve-hive-hit { fill: none; stroke: transparent; stroke-width: 10px; pointer-events: stroke; }
+.sieve-hive-arrow { fill: var(--dsw-alias-label-tertiary); }
+.sieve-hive-bar { stroke: var(--dsw-alias-label-primary); stroke-width: 2px; }
+.sieve-hive-node { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.sieve-hive-avatar { display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-interactive-bg-hover); font-weight: 600; }
+.sieve-hive-avatar[data-status="running"], .sieve-hive-avatar[data-status="wrapping-up"] { border-color: var(--dsw-alias-label-primary); }
+.sieve-hive-avatar[data-status="failed"], .sieve-hive-avatar[data-status="timed-out"], .sieve-hive-avatar[data-status="stalled"] { border-color: var(--dsw-alias-state-error-primary); }
+.sieve-hive-node-name { max-width: 100%; font-weight: 600; overflow-wrap: anywhere; }
+.sieve-hive-node-status, .sieve-hive-node-counts { color: var(--dsw-alias-label-tertiary); font-size: 11px; line-height: 14px; }
+.sieve-hive-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; list-style: none; color: var(--dsw-alias-label-secondary); }
+.sieve-hive-legend li { display: flex; align-items: center; gap: 4px; }
+.sieve-hive-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sieve-hive-list li { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; border-bottom: 0.5px solid var(--dsw-alias-border-l2); }
+.sieve-hive-route { font-weight: 600; }
+.sieve-hive-kind { color: var(--dsw-alias-label-tertiary); font-size: 11px; }
+.sieve-hive-list li[data-passed="false"] .sieve-hive-route { color: var(--dsw-alias-label-tertiary); }
 `
 
 /**

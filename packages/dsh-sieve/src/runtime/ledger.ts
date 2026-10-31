@@ -1,8 +1,7 @@
 /**
  * Ledger storage protocol v1: judged decisions per session in a DSH
  * `ctx.storage` domain, never in the session log (custom session events make
- * a session unresumable, see notes/implemented/architecture/
- * 2026-10-03-no-custom-session-events.md). The ledger is bookkeeping: a write
+ * a session unresumable). The ledger is bookkeeping: a write
  * that fails is logged and dropped, and never changes a decision.
  *
  * Layout: domain `sieve_ledger`, table `sessions`, one document per session id

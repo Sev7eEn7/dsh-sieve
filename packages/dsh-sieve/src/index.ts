@@ -30,7 +30,7 @@ import type { LedgerAnnotation, LedgerRecord } from './judge/ledger.ts'
 import { LayaJudgeProvider } from './judge/providers/laya.ts'
 import { SystemOneJudgeProvider } from './judge/providers/system-one.ts'
 import { environmentSecrets } from './judge/redact.ts'
-import { Config, resolveConfig } from './runtime/config.ts'
+import { Config, profileModeOf, resolveConfig } from './runtime/config.ts'
 import type { DecisionId, ResolvedConfig } from './runtime/config.ts'
 import { SessionLedgers, ledgerDomain } from './runtime/ledger.ts'
 import { JEV_BASE_URLS, StoredJevJudge, describeJevKeys, resolveJevKey, storeJevKey } from './runtime/jev.ts'
@@ -38,9 +38,17 @@ import type { JevKey } from './runtime/jev.ts'
 import { registerAdmission } from './features/admission.ts'
 import { registerForgetting } from './features/forgetting.ts'
 import { registerSkills } from './features/skills.ts'
+import { HiveRuntime, registerHive } from './features/hive/index.ts'
+import { hiveView } from './features/hive/view.ts'
+import { registerMonitor } from './features/monitor/index.ts'
+import { registerCheckpoint } from './features/checkpoint/index.ts'
+import type { CheckpointRuntime } from './features/checkpoint/index.ts'
+import { registerResume } from './features/resume/index.ts'
+import { registerApproval } from './features/approval/index.ts'
+import { registerTeam } from './features/team/index.ts'
 import { SessionRuntime, STATE_KEY } from './runtime/session-state.ts'
 import { DEFAULT_RECENT_RECORDS, buildStatus } from './runtime/status.ts'
-import type { JevService, SieveJudgeStatus, SieveStatus } from './status.ts'
+import type { JevService, SieveHiveView, SieveJudgeStatus, SieveStatus } from './status.ts'
 import { registerSieveCommand } from './commands/sieve.ts'
 
 export * as judge from './judge/index.ts'
@@ -66,11 +74,20 @@ export interface SessionScope {
 /** How long unloading waits past the judge deadline for calls that ignore their abort. */
 const SETTLE_MARGIN_MS = 1000
 
+/** Records held while the ledger opens; past this, the oldest are dropped. */
+const EARLY_RECORD_CAP = 1000
+
 export class Sieve extends Service {
   static Config = Config
 
   readonly config: ResolvedConfig
   private ledgers: SessionLedgers | undefined
+  /**
+   * Records of decisions made while the ledger was not open: the storage
+   * domain opens asynchronously and the features decide from the first turn.
+   * Written when it opens.
+   */
+  private early: { readonly sessionId: SessionId, record: LedgerRecord }[] = []
   /** Runtime mode overrides per session; a session without any has no entry. */
   private readonly overrides = new Map<SessionId, Map<DecisionId, DecisionMode>>()
   private readonly revisions = new Map<SessionId, number>()
@@ -81,6 +98,10 @@ export class Sieve extends Service {
   private readonly configured: JudgeLike | undefined
   /** Jev keys resolved from the credential store, so judged states never carry them. */
   private readonly jevSecrets = new Set<string>()
+  /** The hive's bees and runs while the hive is mounted. */
+  hive: HiveRuntime | undefined
+  /** Checkpoints and rewinds while they are mounted. */
+  checkpoints: CheckpointRuntime | undefined
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'sieve')
@@ -123,7 +144,7 @@ export class Sieve extends Service {
     }, 'sieve.lifetime')
 
     // The ledger needs the storage domain facility (mounted by dsh-base). Without it
-    // sieve still decides; nothing is recorded.
+    // sieve still decides; the latest records wait in memory and are stored once it opens.
     ctx.plugin({
       name: 'sieve-ledger',
       inject: ['storageDomain'],
@@ -131,6 +152,7 @@ export class Sieve extends Service {
         const domain = await child.storageDomain.open(ledgerDomain)
         const ledgers = new SessionLedgers(domain.table('sessions'), child.logger)
         this.ledgers = ledgers
+        for (const { sessionId, record } of this.early.splice(0)) void ledgers.append(sessionId, record)
         child.effect(() => async () => {
           // Decisions still running record before the ledger closes, whether sieve or only storage unloads.
           await this.settle()
@@ -148,8 +170,56 @@ export class Sieve extends Service {
         child.plugin({ name: 'sieve-admission', inject: ['tools', 'spillStore'], apply: (feature: Context) => { registerAdmission(feature, this, runtime) } })
         child.plugin({ name: 'sieve-forgetting', inject: ['spillStore'], apply: (feature: Context) => { registerForgetting(feature, this, runtime) } })
         child.plugin({ name: 'sieve-skills', inject: ['skills'], apply: (feature: Context) => { registerSkills(feature, this, runtime) } })
+        if (this.config.monitor.enabled) {
+          child.plugin({ name: 'sieve-monitor', inject: ['tools'], apply: (feature: Context) => { registerMonitor(feature, this, runtime) } })
+        }
+        if (this.config.checkpoint.enabled) {
+          child.plugin({
+            name: 'sieve-checkpoint',
+            inject: ['tools'],
+            apply: (feature: Context) => {
+              const checkpoints = registerCheckpoint(feature, this, runtime)
+              this.checkpoints = checkpoints
+              feature.effect(() => () => {
+                if (this.checkpoints === checkpoints) this.checkpoints = undefined
+              }, 'sieve.checkpoint-runtime')
+            },
+          })
+        }
+        if (this.config.resume.enabled) {
+          child.plugin({ name: 'sieve-resume', apply: (feature: Context) => { registerResume(feature, this, runtime) } })
+        }
+        if (this.config.approval.enabled) {
+          child.plugin({
+            name: 'sieve-approval',
+            inject: ['permissionPresets', 'approval', 'sessions', 'agents'],
+            apply: (feature: Context) => { registerApproval(feature, this, runtime) },
+          })
+        }
+        // Only where DSH's agent team is mounted: without it the plugin waits for a service that never comes.
+        if (this.config.team.enabled) {
+          child.plugin({
+            name: 'sieve-team',
+            inject: ['agentTeams', 'subagents', 'agents', 'tools'],
+            apply: (feature: Context) => { registerTeam(feature, this, runtime) },
+          })
+        }
       },
     })
+    if (this.config.hive.enabled) {
+      ctx.plugin({
+        name: 'sieve-hive',
+        inject: ['subagents', 'tools', 'agents'],
+        apply: (child: Context) => {
+          const runtime = new HiveRuntime()
+          this.hive = runtime
+          child.effect(() => () => {
+            if (this.hive === runtime) this.hive = undefined
+          }, 'sieve.hive-runtime')
+          registerHive(child, this, runtime)
+        },
+      })
+    }
     ctx.plugin({
       name: 'sieve-command',
       inject: ['commands'],
@@ -158,13 +228,13 @@ export class Sieve extends Service {
   }
 
   /**
-   * The mode a decision runs in: the session's runtime override, the profile's
-   * entry, or the profile default. Without a session, the profile's.
+   * The mode a decision runs in: the session's runtime override, else the
+   * profile's (`profileModeOf`). Without a session, the profile's.
    */
   modeOf(specId: string, sessionId?: SessionId): DecisionMode {
     const id = specId as DecisionId
     const override = sessionId === undefined ? undefined : this.overrides.get(sessionId)?.get(id)
-    return override ?? this.config.modes.get(id) ?? this.config.defaultMode
+    return override ?? profileModeOf(this.config, id)
   }
 
   /** Override a decision's mode in one session until the service unloads; undefined returns it to the profile. */
@@ -223,7 +293,13 @@ export class Sieve extends Service {
       modeOf: id => this.modeOf(id, sessionId),
       overridden: id => this.overrides.get(sessionId)?.has(id) ?? false,
       recent: options.recent ?? DEFAULT_RECENT_RECORDS,
+      checkpoint: this.checkpoints?.status(sessionId, agent),
     })
+  }
+
+  /** A session's hives for the Web panel: the stored runs and the running ones as they are now. */
+  hiveView(sessionId: SessionId): SieveHiveView {
+    return hiveView(this.config.hive.enabled, this.hive?.records(sessionId) ?? [])
   }
 
   /** Which judge answers next, and which Jev keys the credential store holds (never their values). */
@@ -249,9 +325,9 @@ export class Sieve extends Service {
     if (apiKey !== undefined) this.jevSecrets.add(apiKey)
   }
 
-  /** A session's ledger records, oldest first; empty when the ledger is not mounted. */
+  /** A session's ledger records, oldest first; the held ones while the ledger is not open. */
   ledger(sessionId: SessionId): readonly LedgerRecord[] {
-    return this.ledgers?.records(sessionId) ?? []
+    return this.ledgers?.records(sessionId) ?? this.early.filter(entry => entry.sessionId === sessionId).map(entry => entry.record)
   }
 
   /**
@@ -259,7 +335,16 @@ export class Sieve extends Service {
    * ledger is not mounted. Never rejects: a failed write is logged by the ledger.
    */
   async annotate(sessionId: SessionId, ledgerId: string, patch: LedgerAnnotation): Promise<void> {
-    await this.ledgers?.annotate(sessionId, ledgerId, patch)
+    if (this.ledgers !== undefined) return this.ledgers.annotate(sessionId, ledgerId, patch)
+    const entry = this.early.find(each => each.sessionId === sessionId && each.record.id === ledgerId)
+    if (entry !== undefined) entry.record = { ...entry.record, ...patch }
+  }
+
+  private append(sessionId: SessionId, record: LedgerRecord): Promise<void> | undefined {
+    if (this.ledgers !== undefined) return this.ledgers.append(sessionId, record)
+    this.early.push({ sessionId, record })
+    if (this.early.length > EARLY_RECORD_CAP) this.early.shift()
+    return undefined
   }
 
   /** A decision engine for one session: the configured judge, the current modes, the session's ledger. */
@@ -267,7 +352,7 @@ export class Sieve extends Service {
     return new DecisionEngine({
       judge: () => this.judgeFor(),
       mode: specId => this.modeOf(specId, scope.sessionId),
-      ledger: { append: record => this.ledgers?.append(scope.sessionId, record) },
+      ledger: { append: record => this.append(scope.sessionId, record) },
       recordState: this.config.recordState,
       knownSecrets: () => this.knownSecrets(),
       signal: this.lifetime.signal,

@@ -10,9 +10,31 @@ import z from '@deepseek-ai/schemastery'
 import { DECISION_MODES } from '../judge/decision.ts'
 import type { DecisionMode } from '../judge/decision.ts'
 
-/** The decisions of the first release (migration plan §1); no others are registered. */
-export const DECISION_IDS = ['tool.admission', 'tool.admission.test-log', 'context.forget', 'skills.disclosure'] as const
+/**
+ * The registered decisions: the first release's four (migration plan §1) and
+ * the harness modules' (docs/plan-harness-modules.md).
+ */
+export const DECISION_IDS = [
+  'tool.admission', 'tool.admission.test-log', 'context.forget', 'skills.disclosure',
+  'hive.publish', 'hive.deliver', 'hive.relate', 'swarm.routing',
+  'goal.met', 'turn.completion', 'turn.drift',
+  'turn.rewind', 'resume.safety',
+  'tool.approval', 'tool.risk',
+  'team.release', 'team.verify', 'team.conflict', 'team.dispatch',
+] as const
 export type DecisionId = typeof DECISION_IDS[number]
+
+/**
+ * Decisions that start in `shadow` until their ledger shows they judge well
+ * (plan D5): they change what an agent does. A profile `default` can only
+ * lower them (to `off`); a per-decision entry sets them outright.
+ */
+const SHADOW_BY_DEFAULT: ReadonlySet<DecisionId> = new Set<DecisionId>([
+  'goal.met', 'turn.completion', 'turn.drift',
+  'team.release', 'team.verify', 'team.conflict', 'team.dispatch',
+])
+
+const MODE_RANK: Readonly<Record<DecisionMode, number>> = { off: 0, shadow: 1, active: 2 }
 
 /** Node caps timers at 2^31 - 1 ms. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647
@@ -51,6 +73,122 @@ export interface Config {
   admission: AdmissionConfig
   forgetting: ForgettingConfig
   skillDisclosure: SkillDisclosureConfig
+  hive: HiveConfig
+  monitor: MonitorConfig
+  checkpoint: CheckpointConfig
+  resume: ResumeConfig
+  approval: ApprovalConfig
+  team: TeamConfig
+}
+
+/**
+ * The team supervisor (plan §4 phase 6). It loads only where DSH's agent team
+ * is mounted, and its actions start in shadow (D5).
+ */
+export interface TeamConfig {
+  enabled: boolean
+  /** Monitor signals (loop, stall, drift) after which a member is interrupted and its tasks released. */
+  stuckAfter: number
+  /** Start a read-only verifier when `team.verify` cannot settle a completed task. */
+  verifier: boolean
+  /** Minutes a verifier may run before it is stopped and the task left as it is; 0 means no limit. */
+  verifierMinutes: number
+}
+
+/**
+ * Jev approval (plan §4 phase 3). Off by default (D2): a wrong approval cannot
+ * be taken back, and owning DSH's single Auto preset excludes auto-review.
+ * Turned on, it acts only in sessions the user switches to Auto.
+ */
+export interface ApprovalConfig {
+  enabled: boolean
+}
+
+/** Crash-resume classification (plan §4 phase 5). */
+export interface ResumeConfig {
+  enabled: boolean
+}
+
+/** The hive (plan §4 phase 1); defaults are mu's. */
+export interface HiveConfig {
+  enabled: boolean
+  maxBees: number
+  /** Bees running at once; the rest wait for a slot. */
+  concurrency: number
+  maxNotesPerBee: number
+  maxDeliveriesPerBee: number
+  /** Earlier notes a new one is held against, at most. */
+  maxRelatedPerNote: number
+  /**
+   * `judged`: the judge picks what is posted and who receives it. `broadcast`:
+   * every step's candidates are posted and handed to every other bee, with no
+   * judge and no corrections, still within the caps above; it exists for the
+   * ablation against the judged hive.
+   */
+  sharing: 'judged' | 'broadcast'
+  /** Tool calls a bee may make in silence before it is asked what it has found; 0 turns checkpoints off. */
+  checkpointEvery: number
+  /** Notes that arrive while a bee writes its report get one hearing: a corrected report, or "NO CHANGE". */
+  lastCall: boolean
+  /** Verifiers the hive may add for disputes nobody settles (0 turns it off), and how long a dispute may stand first. */
+  verifyConflicts: number
+  verifyAfterSeconds: number
+  /** Minutes a bee may work before it is told to wrap up and its tools close; 0 means no budget. */
+  beeMinutes: number
+  /** Seconds it then has to hand in its report before it is stopped. */
+  graceSeconds: number
+  /** Seconds without a sign of life before a bee is stopped: while its model works, and while a tool runs. */
+  stallSeconds: number
+  toolStallSeconds: number
+  /**
+   * Model ladder from cheapest to strongest, each `provider/model` (the first
+   * `/` separates them). Empty: every bee runs on the parent's model and
+   * `swarm.routing` is not asked.
+   */
+  models: string[]
+  /** The route's reasoning-effort id for each thinking level `swarm.routing` picks; unset levels keep the parent's. */
+  efforts: { low?: string, medium?: string, high?: string }
+}
+
+/** Long-task monitoring (plan §4 phase 2); cadences are mu's. */
+export interface MonitorConfig {
+  enabled: boolean
+  /** How long the end of a turn and `update_goal complete` wait for an active verdict; defaults to the judge deadline. */
+  waitMs: number
+  /** Tool results between two drift questions while a goal is active. */
+  every: number
+  /** Results in a row of the same call ending the same way that make a loop. */
+  repeats: number
+  /** Recent actions the drift question reads. */
+  window: number
+  /** Loops of `repeats` results in a row after which an active goal is blocked as stalled. */
+  stallLoops: number
+}
+
+/** Checkpoints of the working tree and the judged rewind (plan §4 phase 4); limits are mu's. */
+export interface CheckpointConfig {
+  enabled: boolean
+  /**
+   * Where the shadow repositories live, one per project. The bundle sets
+   * `dshHomePath('sieve', 'checkpoints')`; empty leaves checkpoints off.
+   */
+  root: string
+  /** Snapshots kept per project, and for how long. */
+  keep: number
+  maxAgeDays: number
+  /** Larger files stay out of snapshots and are never touched by a rewind. */
+  maxFileMb: number
+  /** A first snapshot past either limit is not taken, and the session goes without checkpoints. */
+  maxFiles: number
+  maxTotalMb: number
+  /** gitignore-style patterns on top of the project's own and the built-in list. */
+  ignore: string[]
+  /** Deadline of one git command. */
+  timeoutMs: number
+  /** Ask `turn.rewind` when the agent goes in circles, and propose going back. */
+  propose: boolean
+  /** A shell command that fails this many times in one turn asks `turn.rewind`. */
+  failures: number
 }
 
 export interface ForgettingConfig {
@@ -143,6 +281,58 @@ export const Config: z<Config> = z.object({
     waitMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS),
     alwaysVisible: z.array(z.string()).default([]),
   }).default({}),
+  hive: z.object({
+    enabled: z.boolean().default(true),
+    maxBees: z.natural().min(2).max(16).default(6),
+    concurrency: z.natural().min(1).max(16).default(4),
+    maxNotesPerBee: z.natural().default(12),
+    maxDeliveriesPerBee: z.natural().default(10),
+    maxRelatedPerNote: z.natural().default(6),
+    sharing: z.union(['judged', 'broadcast'] as const).default('judged'),
+    checkpointEvery: z.natural().default(4),
+    lastCall: z.boolean().default(true),
+    verifyConflicts: z.natural().max(4).default(1),
+    verifyAfterSeconds: z.natural().min(1).default(60),
+    beeMinutes: z.natural().default(10),
+    graceSeconds: z.natural().min(1).default(90),
+    stallSeconds: z.natural().min(1).default(300),
+    toolStallSeconds: z.natural().min(1).default(900),
+    models: z.array(z.string()).default([]),
+    efforts: z.object({ low: z.string(), medium: z.string(), high: z.string() }).default({}),
+  }).default({}),
+  monitor: z.object({
+    enabled: z.boolean().default(true),
+    waitMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS),
+    every: z.natural().min(1).default(6),
+    repeats: z.natural().min(2).default(3),
+    window: z.natural().min(1).max(32).default(8),
+    stallLoops: z.natural().min(2).default(2),
+  }).default({}),
+  checkpoint: z.object({
+    enabled: z.boolean().default(true),
+    root: z.string().default(''),
+    keep: z.natural().min(1).default(50),
+    maxAgeDays: z.natural().min(1).default(14),
+    maxFileMb: z.number().min(0).default(5),
+    maxFiles: z.natural().min(1).default(5000),
+    maxTotalMb: z.number().min(0).default(200),
+    ignore: z.array(z.string()).default([]),
+    timeoutMs: z.natural().min(1).max(MAX_TIMER_DELAY_MS).default(30_000),
+    propose: z.boolean().default(true),
+    failures: z.natural().min(2).default(3),
+  }).default({}),
+  resume: z.object({
+    enabled: z.boolean().default(true),
+  }).default({}),
+  approval: z.object({
+    enabled: z.boolean().default(false),
+  }).default({}),
+  team: z.object({
+    enabled: z.boolean().default(true),
+    stuckAfter: z.natural().min(1).default(2),
+    verifier: z.boolean().default(true),
+    verifierMinutes: z.number().min(0).max(MAX_TIMER_DELAY_MS / 60_000).default(10),
+  }).default({}),
 })
 
 export type ResolvedJudge =
@@ -172,6 +362,37 @@ export interface ResolvedConfig {
   readonly admission: Readonly<Omit<AdmissionConfig, 'passThrough' | 'contentTools'>> & { readonly passThrough: readonly string[], readonly contentTools: readonly string[] }
   readonly forgetting: Readonly<ForgettingConfig>
   readonly skillDisclosure: Readonly<Omit<SkillDisclosureConfig, 'alwaysVisible'>> & { readonly alwaysVisible: readonly string[] }
+  readonly hive: ResolvedHiveConfig
+  readonly monitor: Readonly<MonitorConfig>
+  readonly checkpoint: Readonly<Omit<CheckpointConfig, 'ignore'>> & { readonly ignore: readonly string[] }
+  readonly resume: Readonly<ResumeConfig>
+  readonly approval: Readonly<ApprovalConfig>
+  readonly team: Readonly<TeamConfig>
+}
+
+export interface ModelRoute {
+  readonly provider: string
+  readonly model: string
+}
+
+export type ResolvedHiveConfig = Readonly<Omit<HiveConfig, 'models' | 'efforts'>> & {
+  readonly models: readonly ModelRoute[]
+  readonly efforts: Readonly<HiveConfig['efforts']>
+}
+
+/** `provider/model`, split at the first `/`. */
+export function parseModelRoute(entry: string): ModelRoute {
+  const at = entry.indexOf('/')
+  if (at <= 0 || at === entry.length - 1) throw new Error(`sieve: hive.models entry "${entry}" is not provider/model`)
+  return { provider: entry.slice(0, at), model: entry.slice(at + 1) }
+}
+
+/** The mode a profile gives a decision: its own entry, else the default, which only lowers a shadow-by-default decision. */
+export function profileModeOf(config: Pick<ResolvedConfig, 'modes' | 'defaultMode'>, id: DecisionId): DecisionMode {
+  const own = config.modes.get(id)
+  if (own !== undefined) return own
+  if (!SHADOW_BY_DEFAULT.has(id)) return config.defaultMode
+  return MODE_RANK[config.defaultMode] < MODE_RANK.shadow ? config.defaultMode : 'shadow'
 }
 
 const MODE_KEYS: ReadonlySet<string> = new Set(['default', ...DECISION_IDS])
@@ -239,5 +460,15 @@ export function resolveConfig(config: Partial<Config> | undefined): ResolvedConf
     }),
     forgetting: Object.freeze({ ...value.forgetting, waitMs: value.forgetting.waitMs ?? Math.min(MAX_TIMER_DELAY_MS, judge.timeoutMs + 1000) }),
     skillDisclosure: Object.freeze({ ...value.skillDisclosure, waitMs: value.skillDisclosure.waitMs ?? judge.timeoutMs, alwaysVisible: Object.freeze([...value.skillDisclosure.alwaysVisible]) }),
+    hive: Object.freeze({
+      ...value.hive,
+      models: Object.freeze(value.hive.models.map(parseModelRoute)),
+      efforts: Object.freeze(Object.fromEntries(Object.entries(value.hive.efforts).filter(([, effort]) => nonEmpty(effort) !== undefined))),
+    }),
+    monitor: Object.freeze({ ...value.monitor, waitMs: value.monitor.waitMs ?? judge.timeoutMs }),
+    checkpoint: Object.freeze({ ...value.checkpoint, ignore: Object.freeze([...value.checkpoint.ignore]) }),
+    resume: Object.freeze({ ...value.resume }),
+    approval: Object.freeze({ ...value.approval }),
+    team: Object.freeze({ ...value.team }),
   })
 }

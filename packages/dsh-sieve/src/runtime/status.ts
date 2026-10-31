@@ -2,8 +2,8 @@
 import type { DecisionMode } from '../judge/decision.ts'
 import type { LedgerRecord } from '../judge/ledger.ts'
 import { DSH_TEXT_CHARS_PER_TOKEN } from '../status.ts'
-import type { SieveDecisionStatus, SieveLatency, SieveRecordSummary, SieveReduction, SieveStatus, SieveUsageTotals } from '../status.ts'
-import { DECISION_IDS } from './config.ts'
+import type { SieveCheckpointStatus, SieveDecisionStatus, SieveLatency, SieveRecordSummary, SieveReduction, SieveStatus, SieveUsageTotals } from '../status.ts'
+import { DECISION_IDS, profileModeOf } from './config.ts'
 import type { DecisionId, ResolvedConfig } from './config.ts'
 
 /** Records listed by default; the ledger keeps up to 1000 per session. */
@@ -25,6 +25,7 @@ export interface StatusInput {
   readonly modeOf: (id: DecisionId) => DecisionMode
   readonly overridden: (id: DecisionId) => boolean
   readonly recent: number
+  readonly checkpoint?: SieveCheckpointStatus | undefined
 }
 
 const ZERO_USAGE: SieveUsageTotals = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, reasoningTokens: 0 }
@@ -64,6 +65,21 @@ function featureEnabled(config: ResolvedConfig, id: DecisionId): boolean {
     case 'tool.admission.test-log': return config.admission.enabled && config.admission.testLog !== 'off'
     case 'context.forget': return config.forgetting.enabled
     case 'skills.disclosure': return config.skillDisclosure.enabled
+    case 'hive.publish':
+    case 'hive.deliver':
+    case 'hive.relate':
+    case 'swarm.routing': return config.hive.enabled
+    case 'goal.met':
+    case 'turn.completion':
+    case 'turn.drift': return config.monitor.enabled
+    case 'turn.rewind': return config.checkpoint.enabled && config.checkpoint.propose && config.checkpoint.root !== ''
+    case 'resume.safety': return config.resume.enabled
+    case 'tool.approval':
+    case 'tool.risk': return config.approval.enabled
+    case 'team.release':
+    case 'team.verify':
+    case 'team.conflict':
+    case 'team.dispatch': return config.team.enabled
   }
 }
 
@@ -109,7 +125,7 @@ export function buildStatus(input: StatusInput): SieveStatus {
       id,
       enabled: featureEnabled(config, id),
       mode: input.modeOf(id),
-      profileMode: config.modes.get(id) ?? config.defaultMode,
+      profileMode: profileModeOf(config, id),
       overridden: input.overridden(id),
       records: own.length,
       rules: own.filter(record => record.source === 'rules').length,
@@ -140,5 +156,6 @@ export function buildStatus(input: StatusInput): SieveStatus {
       usage: sumUsage(records),
     },
     recent: count === 0 ? [] : records.slice(-count).reverse().map(summarize),
+    ...(input.checkpoint === undefined ? {} : { checkpoint: input.checkpoint }),
   }
 }

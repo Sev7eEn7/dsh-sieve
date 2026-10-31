@@ -1,3 +1,6 @@
 - insert:
     - id: sieve
       name: dsh-sieve
+      config:
+        checkpoint:
+          root: !!js dshHomePath('sieve', 'checkpoints')

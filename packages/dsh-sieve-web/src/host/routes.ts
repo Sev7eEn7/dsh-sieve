@@ -8,7 +8,6 @@
  * Why not `connection.rpc.handle`: at the pinned DSH it registers its Web
  * route through `owner.webServer`, which Cordis resolves against the
  * Connection plugin's own fiber, and that fiber does not inject `webServer`.
- * See notes/implemented/architecture/2026-10-05-web-panel-over-connection-routes.md.
  */
 import type { ConnectionFetchRoute, ServerResponse } from '@deepseek-ai/dsh-client-connection'
 import { API_CHANNEL, ENDPOINTS } from '../protocol.ts'

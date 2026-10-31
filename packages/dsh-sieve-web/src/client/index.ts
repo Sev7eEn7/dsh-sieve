@@ -1,7 +1,8 @@
 /**
- * dsh-sieve-web, browser half: a right-Sidebar tab showing the open session's
- * context reduction and the Jev keys the judge uses, through the Host half's
- * routes on Connection's `/api` channel. Exports only what Cordis loading needs.
+ * dsh-sieve-web, browser half: two right-Sidebar tabs, one showing the open
+ * session's context reduction and the Jev keys the judge uses, one showing its
+ * hives, through the Host half's routes on Connection's `/api` channel.
+ * Exports only what Cordis loading needs.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -14,6 +15,9 @@ import { en, NS, zh } from './locales.ts'
 import { SievePanel } from './Panel.tsx'
 import type { SievePanelInjected } from './Panel.tsx'
 import { PanelSource } from './source.ts'
+import { SieveHivePanel } from './HivePanel.tsx'
+import type { SieveHivePanelInjected } from './HivePanel.tsx'
+import { HiveSource } from './hive-source.ts'
 import { mountStyles } from './styles.ts'
 
 export const inject = ['slots', 'locale', 'sidebarRightTabs', 'connection']
@@ -24,6 +28,9 @@ const PANEL_ID = 'dsh-sieve-web'
 const PANEL_KIND = 'sieve'
 /** Position among guide entries; after the shipped ones. */
 const GUIDE_ORDER = 80
+/** The Hive page: a tab of its own, so it can sit beside the session. */
+const HIVE_ID = 'dsh-sieve-web-hive'
+const HIVE_KIND = 'sieve-hive'
 
 /** The browser Connection face. Read by name: no shipped declaration types it on `Context` for a plugin. */
 function connectionOf(ctx: Context): { readonly rpc: ClientConnectionRpc } {
@@ -57,9 +64,23 @@ export function apply(ctx: Context): void {
     faces.set(sessionId, { source, face })
     return face
   }
+  const hives = new Map<string, { readonly source: HiveSource; readonly face: SieveHivePanelInjected }>()
+  ctx.effect(() => () => {
+    for (const { source } of hives.values()) source.dispose()
+    hives.clear()
+  }, 'sieve-web: hive sources')
+  const hiveFaceOf = (sessionId: string): SieveHivePanelInjected => {
+    const existing = hives.get(sessionId)
+    if (existing !== undefined) return existing.face
+    const source = new HiveSource(sessionId, (endpoint, payload, signal) => rpc.call(API_CHANNEL, endpoint, payload, signal))
+    const face: SieveHivePanelInjected = { hooks: { hive: source }, refresh: () => source.refresh() }
+    hives.set(sessionId, { source, face })
+    return face
+  }
   // A new connection generation may follow a Host restart; re-read what is on screen.
   ctx.on('connection/reset', () => {
     for (const { source } of faces.values()) if (source.started) void source.refresh()
+    for (const { source } of hives.values()) if (source.started) void source.refresh()
   })
 
   const t = ctx.locale.bind(NS)
@@ -75,4 +96,17 @@ export function apply(ctx: Context): void {
     locale: NS,
     inject: (sessionId): SievePanelInjected => faceOf(String(sessionId)),
   }, SievePanel))
+
+  ctx.effect(() => ctx.sidebarRightTabs.register({
+    id: HIVE_ID,
+    kind: HIVE_KIND,
+    title: () => t('hive.tab.title'),
+    guide: [{ id: 'open', order: GUIDE_ORDER + 1, title: () => t('hive.tab.title'), description: () => t('hive.tab.description') }],
+  }), 'sieve-web: hive tab')
+  ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
+    name: 'sidebar.right.pane.tab',
+    key: HIVE_ID,
+    locale: NS,
+    inject: (sessionId): SieveHivePanelInjected => hiveFaceOf(String(sessionId)),
+  }, SieveHivePanel))
 }
