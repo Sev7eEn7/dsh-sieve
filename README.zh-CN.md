@@ -13,10 +13,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](tsconfig.base.json)
 [![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933?logo=nodedotjs&logoColor=white)](package.json)
-[![DeepSeek Harness](https://img.shields.io/badge/DSH-0.2.1--rc.2-4D6BFE)](packages/dsh-sieve/package.json)
+[![DeepSeek Harness](https://img.shields.io/badge/DSH-0.2.1--rc.2%2B-4D6BFE)](packages/dsh-sieve/package.json)
 [![Cordis](https://img.shields.io/badge/Cordis-4.0.5-6E56CF)](packages/dsh-sieve/package.json)
 <br>
-![Tests](https://img.shields.io/badge/tests-395%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-397%20passed-brightgreen)
 ![Test keys](https://img.shields.io/badge/test%20suite-no%20API%20keys-brightgreen)
 [![DSH core](https://img.shields.io/badge/DSH%20core-0%20patches-brightgreen)](#设计约束)
 [![Cold restore](https://img.shields.io/badge/cold%20restore-replay%20safe-brightgreen)](#设计约束)
@@ -116,7 +116,7 @@ sieve 的 Harness 模块共用同一个判断内核：不只给 Token 止血，�
 ## 0.4.0 更新：Harness 模块
 
 > [!NOTE]
-> **已在 0.4.0 发布。** 从只有省 token 决策的 0.3.0 升级：运行 `dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0`，然后重启 `dsh web`，见[升级与卸载](#升级与卸载)。
+> **已在 0.4.0 发布**；0.4.1 功能相同，并且能在 DSH 0.2.1-rc.3 及以后的版本上加载。从只有省 token 决策的 0.3.0 升级：运行 `dsh plugin --profile web add dsh-sieve@0.4.1 dsh-sieve-web@0.4.1`，然后重启 `dsh web`，见[升级与卸载](#升级与卸载)。
 
 省 Token 只是前半场。面对长周期、深水区的复杂任务，sieve 引入六大 Harness 模块，全由同一个判断内核驱动，专治各种“假动作”与迷航：
 
@@ -149,7 +149,7 @@ Hive、检查点和崩溃恢复默认生效。长任务监控和团队监工默�
 1. 安装插件（Web profile 同时装面板）：
 
    ```bash
-   dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0
+   dsh plugin --profile web add dsh-sieve@0.4.1 dsh-sieve-web@0.4.1
    ```
 
 2. 配置判断模型，二选一：
@@ -490,10 +490,13 @@ sieve 减少工具输出、历史结果和技能目录中被反复发送的冗�
 | `dsh-sieve` | 插件本体：判断内核、省 token 决策、Harness 模块、账本、`/sieve` 与 `/hive` 命令 | 任意（`web`、`headless` 等） |
 | `dsh-sieve-web` | Web 右侧栏的 **Sieve** 页和 **Hive** 页，依赖同版本的 `dsh-sieve` | 仅 `web` |
 
-**版本对应**：sieve 按 DSH 精确版本声明 peer，宿主在安装和启动时校验，版本不符会拒绝加载。
+**版本对应**：从 0.4.1 起，两个包都用 `engines.dsh` 声明支持的 DSH 版本；宿主在安装和启动时校验，范围外拒绝加载。表中标为“已核对”的 DSH 版本，都对比过 sieve 用到的 DSH 包的改动，并实际加载过打包后的插件。
+
+`dsh-sieve` 0.4.0 及更早版本把 DSH peer 钉在精确版本上，换任何别的 DSH 版本都会被跳过（[issue #7](https://github.com/Sev7eEn7/dsh-sieve/issues/7)），请升级到 0.4.1。如果要继续用 0.4.0，可以对一组精确版本手动承担风险：`dsh plugin --profile <profile> allow-version dsh-sieve@0.4.0 --dsh-version <dsh --version 的输出> --accept-risk`。
 
 | sieve | DeepSeek Harness | Node.js |
 |---|---|---|
+| `0.4.1` | `>=0.2.1-rc.2 <0.2.2-0`；已核对 `0.2.1-rc.2` 到 `0.2.1-rc.5` | `^22.19.0 \|\| >=24.0.0` |
 | `0.4.0` | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
 | `0.3.0` | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
 | `0.2.0` | `0.2.1-alpha.1` | `^22.19.0 \|\| >=24.0.0` |
@@ -505,23 +508,23 @@ sieve 减少工具输出、历史结果和技能目录中被反复发送的冗�
 预构建包，不需要在本机编译，也不需要授权构建脚本。插件本体与 Web 面板一起装：
 
 ```bash
-dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0
+dsh plugin --profile web add dsh-sieve@0.4.1 dsh-sieve-web@0.4.1
 ```
 
 `headless` 等没有 Web 界面的 profile 只装本体：
 
 ```bash
-dsh plugin --profile headless add dsh-sieve@0.4.0
+dsh plugin --profile headless add dsh-sieve@0.4.1
 ```
 
-也可以在 DSH Web 侧边栏打开**插件 → 添加插件**，依次输入 `dsh-sieve@0.4.0`、`dsh-sieve-web@0.4.0` 安装，效果与命令行相同。
+也可以在 DSH Web 侧边栏打开**插件 → 添加插件**，依次输入 `dsh-sieve@0.4.1`、`dsh-sieve-web@0.4.1` 安装，效果与命令行相同。
 
 ### 方式二：GitHub Release
 
 npm 不可达或想锁定到构建产物时，直接装 [Release](https://github.com/Sev7eEn7/dsh-sieve/releases) 附带的 tgz，同样是预构建包。发布页附有 `SHA256SUMS` 供校验：
 
 ```bash
-dsh plugin --profile web add https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.0/dsh-sieve-0.4.0.tgz https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.0/dsh-sieve-web-0.4.0.tgz
+dsh plugin --profile web add https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.1/dsh-sieve-0.4.1.tgz https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.1/dsh-sieve-web-0.4.1.tgz
 ```
 
 ### 方式三：从源码构建
@@ -535,10 +538,10 @@ pnpm install && pnpm release:pack
 ```
 
 ```bash
-dsh plugin --profile web add ./release/dsh-sieve-0.4.0.tgz ./release/dsh-sieve-web-0.4.0.tgz
+dsh plugin --profile web add ./release/dsh-sieve-0.4.1.tgz ./release/dsh-sieve-web-0.4.1.tgz
 ```
 
-`pnpm release:pack` 会构建两个包，检查版本与 peer 一致、产物里没有 `workspace:` 和本机路径，然后把 tgz 和 `SHA256SUMS` 输出到 `release/`。
+`pnpm release:pack` 会构建两个包，检查版本与 peer 一致、两个包声明同一个覆盖 npm `latest` 与 `next` 标签上 DSH 版本的 `engines.dsh`、产物里没有 `workspace:` 和本机路径，然后把 tgz 和 `SHA256SUMS` 输出到 `release/`。
 
 > [!NOTE]
 > 不支持 `github:Sev7eEn7/dsh-sieve` 这种 git 安装：仓库是 monorepo，git 安装只拿到源码，不带 `lib/` 构建产物。请用上面三种方式之一。
@@ -657,7 +660,7 @@ pnpm typecheck && pnpm test
 - `pnpm smoke:package` 把打好的 tgz 装进 `.dsh-test-home/` 下的一次性 profile，启动 web profile 并探测面板接口，最后卸载；不碰真实的 `DSH_HOME`，不调用模型，不进 `pnpm test`。
 - `pnpm release:pack` 构建并打包出可安装的 tgz 与 `SHA256SUMS`，见[安装](#方式三从源码构建)。
 - 实测脚本，都不进 `pnpm test`：`pnpm measure:approval` 用真实 Jev 回放带标签的审批调用（需要 `TYPESAFE_API_KEY`，只花 judge 费用）；`pnpm measure:hive` 跑 hive 消融实验（`--estimate`、`--preflight` 不花钱，`--execute` 花主模型和 Jev 费用，需要 `--approved-usd`）；`pnpm measure:shadow` 从账本统计 shadow 决策的精度，不调用模型。
-- 依赖全部锁定精确版本；`@deepseek-ai/dsh-*` 以精确版本声明为 peer，宿主在安装与启动时校验。
+- 依赖全部锁定精确版本，测试跑在 DSH `0.2.1-rc.2` 上。`engines.dsh` 与 `@deepseek-ai/dsh-*` peer 声明同一个范围，宿主在安装与启动时校验；`DSH_SMOKE_VERSION=<版本> pnpm smoke:package` 可在范围内的其他 DSH 版本上跑打包冒烟。
 
 ```
 packages/

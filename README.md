@@ -13,10 +13,10 @@ Context engineering, token efficiency and long-task supervision plugins for Deep
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](tsconfig.base.json)
 [![Node](https://img.shields.io/badge/node-%5E22.19%20%7C%7C%20%3E%3D24-339933?logo=nodedotjs&logoColor=white)](package.json)
-[![DeepSeek Harness](https://img.shields.io/badge/DSH-0.2.1--rc.2-4D6BFE)](packages/dsh-sieve/package.json)
+[![DeepSeek Harness](https://img.shields.io/badge/DSH-0.2.1--rc.2%2B-4D6BFE)](packages/dsh-sieve/package.json)
 [![Cordis](https://img.shields.io/badge/Cordis-4.0.5-6E56CF)](packages/dsh-sieve/package.json)
 <br>
-![Tests](https://img.shields.io/badge/tests-395%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-397%20passed-brightgreen)
 ![Test keys](https://img.shields.io/badge/test%20suite-no%20API%20keys-brightgreen)
 [![DSH core](https://img.shields.io/badge/DSH%20core-0%20patches-brightgreen)](#design-constraints)
 [![Cold restore](https://img.shields.io/badge/cold%20restore-replay%20safe-brightgreen)](#design-constraints)
@@ -116,7 +116,7 @@ For AI coding agents on DeepSeek Harness, especially with verbose test logs, fre
 ## What's new in 0.4.0: harness modules
 
 > [!NOTE]
-> **Released in 0.4.0.** Coming from 0.3.0, which has only the token-saving decisions? Run `dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0` and restart `dsh web`; see [Upgrade and uninstall](#upgrade-and-uninstall).
+> **Released in 0.4.0**; 0.4.1 is the same plugin and also loads on DSH 0.2.1-rc.3 and later. Coming from 0.3.0, which has only the token-saving decisions? Run `dsh plugin --profile web add dsh-sieve@0.4.1 dsh-sieve-web@0.4.1` and restart `dsh web`; see [Upgrade and uninstall](#upgrade-and-uninstall).
 
 Saving tokens was only the opening act. For deep, long-horizon tasks, sieve introduces six harness modules driven by the exact same judge engine to prevent drift, loops, and false completions:
 
@@ -149,7 +149,7 @@ Also new: `/sieve checkpoints`, `/sieve rewind`, `/sieve rewind undo` and `/hive
 1. Install the plugin (the web profile also gets the panel):
 
    ```bash
-   dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0
+   dsh plugin --profile web add dsh-sieve@0.4.1 dsh-sieve-web@0.4.1
    ```
 
 2. Configure a judge model, one of:
@@ -490,10 +490,13 @@ No. A judge request carries only the content being judged and the task goal (red
 | `dsh-sieve` | The plugin: judgment kernel, token-saving decisions, harness modules, ledger, `/sieve` and `/hive` commands | Any (`web`, `headless`, …) |
 | `dsh-sieve-web` | The Web right sidebar's **Sieve** and **Hive** pages; needs `dsh-sieve` of the same version | `web` only |
 
-**Version compatibility**: sieve declares its DSH peers at exact versions; the host checks them at install and startup and refuses to load on a mismatch.
+**Version compatibility**: from 0.4.1, both packages declare the DSH releases they support in `engines.dsh`; the host checks it at install and startup and refuses to load outside it. Each DSH release listed as checked had the DSH packages sieve uses compared against it, and the packed plugin booted on it.
+
+`dsh-sieve` 0.4.0 and earlier pinned their DSH peers to exact versions, so DSH skips them on any other release ([issue #7](https://github.com/Sev7eEn7/dsh-sieve/issues/7)): upgrade to 0.4.1. To stay on 0.4.0, accept the risk for one exact pair of versions: `dsh plugin --profile <profile> allow-version dsh-sieve@0.4.0 --dsh-version <dsh --version> --accept-risk`.
 
 | sieve | DeepSeek Harness | Node.js |
 |---|---|---|
+| `0.4.1` | `>=0.2.1-rc.2 <0.2.2-0`; checked on `0.2.1-rc.2` to `0.2.1-rc.5` | `^22.19.0 \|\| >=24.0.0` |
 | `0.4.0` | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
 | `0.3.0` | `0.2.1-rc.2` | `^22.19.0 \|\| >=24.0.0` |
 | `0.2.0` | `0.2.1-alpha.1` | `^22.19.0 \|\| >=24.0.0` |
@@ -505,23 +508,23 @@ From 0.4.0, the harness modules add `dsh-subagent`, `dsh-goal`, `dsh-permission-
 Prebuilt packages: nothing compiles on your machine and no build scripts need approval. Install the plugin and the Web panel together:
 
 ```bash
-dsh plugin --profile web add dsh-sieve@0.4.0 dsh-sieve-web@0.4.0
+dsh plugin --profile web add dsh-sieve@0.4.1 dsh-sieve-web@0.4.1
 ```
 
 Profiles without a Web UI, such as `headless`, install only the plugin:
 
 ```bash
-dsh plugin --profile headless add dsh-sieve@0.4.0
+dsh plugin --profile headless add dsh-sieve@0.4.1
 ```
 
-You can also open **Plugins → Add plugin** in the DSH Web sidebar and enter `dsh-sieve@0.4.0`, then `dsh-sieve-web@0.4.0`; the result is the same.
+You can also open **Plugins → Add plugin** in the DSH Web sidebar and enter `dsh-sieve@0.4.1`, then `dsh-sieve-web@0.4.1`; the result is the same.
 
 ### Option 2: GitHub Release
 
 If npm is unreachable or you want to pin the exact build, install the tarballs attached to the [Release](https://github.com/Sev7eEn7/dsh-sieve/releases). They are the same prebuilt packages. The release includes `SHA256SUMS` for verification:
 
 ```bash
-dsh plugin --profile web add https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.0/dsh-sieve-0.4.0.tgz https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.0/dsh-sieve-web-0.4.0.tgz
+dsh plugin --profile web add https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.1/dsh-sieve-0.4.1.tgz https://github.com/Sev7eEn7/dsh-sieve/releases/download/v0.4.1/dsh-sieve-web-0.4.1.tgz
 ```
 
 ### Option 3: Build from source
@@ -535,10 +538,10 @@ pnpm install && pnpm release:pack
 ```
 
 ```bash
-dsh plugin --profile web add ./release/dsh-sieve-0.4.0.tgz ./release/dsh-sieve-web-0.4.0.tgz
+dsh plugin --profile web add ./release/dsh-sieve-0.4.1.tgz ./release/dsh-sieve-web-0.4.1.tgz
 ```
 
-`pnpm release:pack` builds both packages, checks that versions and peers agree and that the output contains no `workspace:` or local paths, then writes the tarballs and `SHA256SUMS` to `release/`.
+`pnpm release:pack` builds both packages, checks that versions and peers agree, that both declare one `engines.dsh` covering the DSH on npm's `latest` and `next` tags, and that the output contains no `workspace:` or local paths, then writes the tarballs and `SHA256SUMS` to `release/`.
 
 > [!NOTE]
 > Installing from git (`github:Sev7eEn7/dsh-sieve`) is not supported: the repository is a monorepo, and a git install gets only the sources, without the built `lib/`. Use one of the three options above.
@@ -657,7 +660,7 @@ pnpm typecheck && pnpm test
 - `pnpm smoke:package` installs the packed tarballs into throwaway profiles under `.dsh-test-home/`, boots the web profile and probes the panel's endpoints, then uninstalls; it never touches your real `DSH_HOME`, calls no model and is not part of `pnpm test`.
 - `pnpm release:pack` builds and packs installable tarballs with `SHA256SUMS`; see [Installation](#option-3-build-from-source).
 - Measurements, never part of `pnpm test`: `pnpm measure:approval` replays the labeled approval calls against the real Jev (needs `TYPESAFE_API_KEY`, spends judge tokens only); `pnpm measure:hive` runs the hive ablation (`--estimate` and `--preflight` cost nothing, `--execute` spends main model and Jev tokens and needs `--approved-usd`); `pnpm measure:shadow` reports the precision of shadow decisions from the ledgers and calls no model.
-- Every dependency is pinned to an exact version; `@deepseek-ai/dsh-*` are declared as exact peers, which the host checks at install and startup.
+- Every dependency is pinned to an exact version, and the tests run against DSH `0.2.1-rc.2`. `engines.dsh` and the `@deepseek-ai/dsh-*` peers declare one range, which the host checks at install and startup; `DSH_SMOKE_VERSION=<version> pnpm smoke:package` runs the packaging smoke on another DSH release in that range.
 
 ```
 packages/

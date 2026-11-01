@@ -1,6 +1,6 @@
 {
   "name": "dsh-sieve-web",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "DSH Web panel for dsh-sieve: context reduction, judge status and ledger records",
   "license": "MIT",
   "keywords": [
@@ -36,6 +36,9 @@
     "cordis.patch.yml",
     "THIRD_PARTY_NOTICES.md"
   ],
+  "engines": {
+    "dsh": ">=0.2.1-rc.2 <0.2.2-0"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -75,6 +78,6 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.5",
-    "dsh-sieve": "0.4.0"
+    "dsh-sieve": "0.4.1"
   }
 }

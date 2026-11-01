@@ -3,16 +3,20 @@
 // publish: `npm publish ./release/<name>-<version>.tgz` for npm, and the same
 // files attached to the GitHub Release `v<version>` for URL installs. Checks
 // that both packages share one version, that dsh-sieve-web peers on that
-// dsh-sieve version, and that no tarball carries workspace: specifiers or
-// repository paths. Publishes nothing and calls no model.
+// dsh-sieve version, that both declare one engines.dsh range covering the DSH
+// on npm's latest and next tags, and that no tarball carries workspace:
+// specifiers or repository paths. Publishes nothing and calls no model.
 
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
+// semver is a dsh-sieve devDependency; the workspace root declares none.
+const semver = createRequire(join(root, 'packages', 'dsh-sieve', 'package.json'))('semver')
 const out = join(root, 'release')
 const repo = 'Sev7eEn7/dsh-sieve'
 const packages = ['dsh-sieve', 'dsh-sieve-web'].map(dir => {
@@ -33,6 +37,23 @@ const [sieve, web] = packages
 const version = sieve.manifest.version
 check(web.manifest.version === version, `both packages are version ${version}`)
 check(web.manifest.peerDependencies['dsh-sieve'] === version, `dsh-sieve-web peers on dsh-sieve ${version}`)
+
+// DSH skips a bundle whose engines.dsh misses the running version, with one stderr line (issue #7).
+const range = sieve.manifest.engines?.dsh
+check(typeof range === 'string' && semver.validRange(range) !== null && web.manifest.engines?.dsh === range, `both packages declare engines.dsh ${range}`)
+const dshPeers = Object.entries(sieve.manifest.peerDependencies).filter(([name]) => name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-'))
+check(dshPeers.every(([, peer]) => peer === range), `dsh-sieve's ${dshPeers.length} DSH peers equal engines.dsh`)
+const tags = JSON.parse(run('npm', ['view', '@deepseek-ai/dsh', 'dist-tags', '--json']))
+for (const channel of ['latest', 'next']) {
+  const current = tags[channel]
+  if (semver.satisfies(current, range, { includePrerelease: true })) {
+    console.log(`ok - DSH ${channel} ${current} is inside engines.dsh`)
+  } else if (process.env.ALLOW_UNSUPPORTED_DSH === '1') {
+    console.log(`warn - DSH ${channel} ${current} is outside engines.dsh; released anyway (ALLOW_UNSUPPORTED_DSH=1), say why in the README`)
+  } else {
+    check(false, `DSH ${channel} ${current} is outside engines.dsh ${range}: verify it and widen the range (AGENTS.md, DSH version compatibility), or set ALLOW_UNSUPPORTED_DSH=1`)
+  }
+}
 
 // TypeScript does not delete output for removed source modules.
 for (const { path } of packages) rmSync(join(path, 'lib'), { recursive: true, force: true })
